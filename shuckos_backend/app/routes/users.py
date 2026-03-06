@@ -1,16 +1,13 @@
 from fastapi import APIRouter, Body
-from app.database import db
+from app.services.user_service import create_user, get_all_users
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
 @router.post("/")
-def create_user(user: dict = Body(...)):
-    result = db.users.insert_one(user)
-    return {"id": str(result.inserted_id)}
+def create_user_route(user: dict = Body(...)):
+   user_id = create_user(user)
+   return {"id": user_id}
 
 @router.get("/")
-def get_users():
-    users = list(db.users.find())
-    for user in users:
-        user["_id"] = str(user["_id"])
-    return users
+def get_users_route():
+   return get_all_users()
