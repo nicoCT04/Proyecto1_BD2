@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from app.routes import users
-from app import database  # 👈 ESTA LÍNEA es clave
+from app.routes import restaurant
+
 
 app = FastAPI(
    title="Plataforma Analítica para Evaluación de Inversión Gastronómica",
@@ -13,6 +14,7 @@ app = FastAPI(
 #http://127.0.0.1:8000/swagger
 
 app.include_router(users.router)
+app.include_router(restaurant.router)
 
 @app.get("/")
 def root():
