@@ -27,3 +27,17 @@ def update_restaurant(restaurant_id: str, data: dict):
 def delete_restaurant(restaurant_id: str):
     db.restaurants.delete_one({"_id": ObjectId(restaurant_id)})
     return {"message": "Restaurant deleted"}
+
+def update_many_restaurants(filter_query: dict, update_data: dict):
+    result = db.restaurants.update_many(
+        filter_query,
+        {"$set": update_data}
+    )
+    return {
+        "matched": result.matched_count,
+        "modified": result.modified_count
+    }
+
+def delete_many_restaurants(filter_query: dict):
+    result = db.restaurants.delete_many(filter_query)
+    return {"deleted": result.deleted_count}

@@ -4,7 +4,9 @@ from app.services.restaurant_service import (
     get_all_restaurants,
     get_restaurant_by_id,
     update_restaurant,
-    delete_restaurant
+    delete_restaurant,
+    update_many_restaurants,
+    delete_many_restaurants
 )
 
 router = APIRouter(prefix="/restaurants", tags=["Restaurants"])
@@ -28,3 +30,14 @@ def update_restaurant_route(restaurant_id: str, data: dict = Body(...)):
 @router.delete("/{restaurant_id}")
 def delete_restaurant_route(restaurant_id: str):
     return delete_restaurant(restaurant_id)
+
+@router.put("/")
+def update_many_route(data: dict = Body(...)):
+    filter_query = data.get("filter")
+    update_data = data.get("update")
+    return update_many_restaurants(filter_query, update_data)
+
+@router.delete("/")
+def delete_many_route(data: dict = Body(...)):
+    filter_query = data.get("filter")
+    return delete_many_restaurants(filter_query)
