@@ -17,4 +17,9 @@ def create_indexes():
     # Menu Items
     db.menu_items.create_index("restaurantId")
 
+    # Quality Inspections
+    db.quality_inspections.create_index(
+    [("restaurantId", 1), ("inspectionDate", -1)]
+)
+
     print("Indexes creados correctamente")
