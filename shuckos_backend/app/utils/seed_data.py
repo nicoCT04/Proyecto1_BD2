@@ -10,18 +10,14 @@ def generate_full_dataset(restaurant_id: str, user_id: str):
     restaurant_object_id = ObjectId(restaurant_id)
     user_object_id = ObjectId(user_id)
 
-    visit_operations = []
-    order_operations = []
-    review_operations = []
-    inspection_operations = []
-
     visit_count = 50000
     conversion_rate = 0.10
     review_rate = 0.40
 
-    # 🔹 Generar visitas
-    for _ in range(visit_count):
+    #  1. VISITS
+    visit_operations = []
 
+    for _ in range(visit_count):
         visit_operations.append(
             InsertOne({
                 "userId": user_object_id,
@@ -39,12 +35,12 @@ def generate_full_dataset(restaurant_id: str, user_id: str):
     if visit_operations:
         db.restaurant_visits.bulk_write(visit_operations)
 
-    # 🔹 Generar órdenes
+    #  2. ORDERS
     order_ids = []
+    total_orders = int(visit_count * conversion_rate)
 
-    for _ in range(int(visit_count * conversion_rate)):
-
-        total = random.randint(30, 150)
+    for _ in range(total_orders):
+        total_amount = random.randint(30, 150)
 
         order = {
             "userId": user_object_id,
@@ -57,7 +53,7 @@ def generate_full_dataset(restaurant_id: str, user_id: str):
                     "subtotal": 35
                 }
             ],
-            "total": total,
+            "total": total_amount,
             "status": "completed",
             "orderDate": datetime.utcnow()
         }
@@ -65,9 +61,13 @@ def generate_full_dataset(restaurant_id: str, user_id: str):
         result = db.orders.insert_one(order)
         order_ids.append(result.inserted_id)
 
-    # 🔹 Generar reviews
-    for order_id in random.sample(order_ids, int(len(order_ids) * review_rate)):
+    #  3. REVIEWS
+    review_operations = []
+    review_count = int(total_orders * review_rate)
 
+    selected_orders = random.sample(order_ids, review_count)
+
+    for order_id in selected_orders:
         review_operations.append(
             InsertOne({
                 "userId": user_object_id,
@@ -83,7 +83,9 @@ def generate_full_dataset(restaurant_id: str, user_id: str):
     if review_operations:
         db.reviews.bulk_write(review_operations)
 
-    # 🔹 Generar inspecciones
+    #  4. INSPECTIONS
+    inspection_operations = []
+
     for _ in range(200):
         inspection_operations.append(
             InsertOne({
@@ -98,10 +100,66 @@ def generate_full_dataset(restaurant_id: str, user_id: str):
     if inspection_operations:
         db.quality_inspections.bulk_write(inspection_operations)
 
+    #  5. RECALCULAR MÉTRICAS DEL RESTAURANTE
+
+    # Orders
+    db.restaurants.update_one(
+        {"_id": restaurant_object_id},
+        {"$set": {"totalOrders": total_orders}}
+    )
+
+    # Reviews
+    review_stats = list(
+        db.reviews.aggregate([
+            {"$match": {"restaurantId": restaurant_object_id}},
+            {
+                "$group": {
+                    "_id": "$restaurantId",
+                    "avgRating": {"$avg": "$rating"},
+                    "totalReviews": {"$sum": 1}
+                }
+            }
+        ])
+    )
+
+    if review_stats:
+        db.restaurants.update_one(
+            {"_id": restaurant_object_id},
+            {
+                "$set": {
+                    "averageRating": review_stats[0]["avgRating"],
+                    "totalReviews": review_stats[0]["totalReviews"]
+                }
+            }
+        )
+
+    # Inspections
+    inspection_stats = list(
+        db.quality_inspections.aggregate([
+            {"$match": {"restaurantId": restaurant_object_id}},
+            {
+                "$group": {
+                    "_id": "$restaurantId",
+                    "avgScore": {"$avg": "$score"}
+                }
+            }
+        ])
+    )
+
+    if inspection_stats:
+        db.restaurants.update_one(
+            {"_id": restaurant_object_id},
+            {
+                "$set": {
+                    "averageQualityScore": inspection_stats[0]["avgScore"]
+                }
+            }
+        )
+
     return {
-        "message": "Dataset realista generado",
+        "message": "Dataset realista generado correctamente",
         "visits": visit_count,
-        "orders": int(visit_count * conversion_rate),
-        "reviews": int(len(order_ids) * review_rate),
+        "orders": total_orders,
+        "reviews": review_count,
         "inspections": 200
     }
