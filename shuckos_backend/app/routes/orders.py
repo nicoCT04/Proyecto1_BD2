@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Body, Query
-from app.services.order_service import create_order, get_all_orders, get_order_by_id
+from app.services.order_service import create_order, get_all_orders, get_order_by_id, get_revenue_by_restaurant
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -20,3 +20,7 @@ def get_orders_route(
 @router.get("/{order_id}")
 def get_order_route(order_id: str):
     return get_order_by_id(order_id)
+
+@router.get("/analytics/revenue")
+def revenue_by_restaurant():
+    return get_revenue_by_restaurant()

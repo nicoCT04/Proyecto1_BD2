@@ -102,3 +102,35 @@ def get_order_by_id(order_id: str):
         order["restaurantId"] = str(order["restaurantId"])
 
     return order
+
+def get_revenue_by_restaurant():
+
+    pipeline = [
+        {
+            "$group": {
+                "_id": "$restaurantId",
+                "totalRevenue": {"$sum": "$total"},
+                "totalOrders": {"$sum": 1}
+            }
+        },
+        {
+            "$lookup": {
+                "from": "restaurants",
+                "localField": "_id",
+                "foreignField": "_id",
+                "as": "restaurant"
+            }
+        },
+        {"$unwind": "$restaurant"},
+        {
+            "$project": {
+                "_id": 0,
+                "restaurant": "$restaurant.name",
+                "totalRevenue": 1,
+                "totalOrders": 1
+            }
+        },
+        {"$sort": {"totalRevenue": -1}}
+    ]
+
+    return list(db.orders.aggregate(pipeline))
