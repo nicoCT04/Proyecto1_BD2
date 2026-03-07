@@ -3,6 +3,7 @@ from app.routes import users
 from app.routes import restaurant
 from app.routes import orders
 from app.routes import menu_items
+from app.routes import admin
 
 
 app = FastAPI(
@@ -19,6 +20,7 @@ app.include_router(users.router)
 app.include_router(restaurant.router)
 app.include_router(menu_items.router)
 app.include_router(orders.router)
+app.include_router(admin.router)
 
 @app.get("/")
 def root():

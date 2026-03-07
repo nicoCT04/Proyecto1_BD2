@@ -1,40 +1,61 @@
-from app.database import db
+from app.database import db, client
 from bson import ObjectId
+from bson.json_util import dumps
 from datetime import datetime
+import json
 
 def create_order(data: dict):
-    user_id = ObjectId(data["userId"])
-    restaurant_id = ObjectId(data["restaurantId"])
-    items_input = data["items"]
 
-    items = []
-    total = 0
+    with client.start_session() as session:
+        with session.start_transaction():
 
-    for item in items_input:
-        price = item["price"]
-        quantity = item["quantity"]
-        subtotal = price * quantity
+            user_id = ObjectId(data["userId"])
+            restaurant_id = ObjectId(data["restaurantId"])
+            items_input = data["items"]
 
-        items.append({
-            "name": item["name"],
-            "price": price,
-            "quantity": quantity,
-            "subtotal": subtotal
-        })
+            items = []
+            total = 0
 
-        total += subtotal
+            for item in items_input:
+                price = item["price"]
+                quantity = item["quantity"]
+                subtotal = price * quantity
 
-    order = {
-        "userId": user_id,
-        "restaurantId": restaurant_id,
-        "items": items,
-        "total": total,
-        "status": "pending",
-        "orderDate": datetime.utcnow()
-    }
+                items.append({
+                    "name": item["name"],
+                    "price": price,
+                    "quantity": quantity,
+                    "subtotal": subtotal
+                })
 
-    result = db.orders.insert_one(order)
-    return str(result.inserted_id)
+                total += subtotal
+
+                #  Actualizar contador en menu_items
+                db.menu_items.update_one(
+                    {"name": item["name"], "restaurantId": restaurant_id},
+                    {"$inc": {"timesOrdered": quantity}},
+                    session=session
+                )
+
+            order = {
+                "userId": user_id,
+                "restaurantId": restaurant_id,
+                "items": items,
+                "total": total,
+                "status": "pending",
+                "orderDate": datetime.utcnow()
+            }
+
+            result = db.orders.insert_one(order, session=session)
+
+            #  Actualizar métrica en restaurante
+            db.restaurants.update_one(
+                {"_id": restaurant_id},
+                {"$inc": {"totalOrders": 1}},
+                session=session
+            )
+
+            return str(result.inserted_id)
 
 def get_all_orders(restaurantId=None, status=None, limit=10, skip=0):
 
@@ -194,3 +215,12 @@ def get_average_ticket_by_restaurant():
     ]
 
     return list(db.orders.aggregate(pipeline))
+
+def explain_orders_by_restaurant(restaurant_id: str):
+
+    explanation = db.orders.find(
+        {"restaurantId": ObjectId(restaurant_id)}
+    ).explain()
+
+    # Convertir a JSON serializable
+    return json.loads(dumps(explanation))

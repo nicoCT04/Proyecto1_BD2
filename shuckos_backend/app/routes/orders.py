@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Body, Query
 from app.services.order_service import( 
     create_order, get_all_orders, get_order_by_id, 
-    get_revenue_by_restaurant, get_top_selling_products, get_average_ticket_by_restaurant)
+    get_revenue_by_restaurant, get_top_selling_products, 
+    get_average_ticket_by_restaurant, explain_orders_by_restaurant)
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -34,3 +35,7 @@ def top_products():
 @router.get("/analytics/average-ticket")
 def average_ticket():
     return get_average_ticket_by_restaurant()
+
+@router.get("/analytics/explain/{restaurant_id}")
+def explain_orders(restaurant_id: str):
+    return explain_orders_by_restaurant(restaurant_id)
