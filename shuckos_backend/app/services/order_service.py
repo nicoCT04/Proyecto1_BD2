@@ -134,3 +134,31 @@ def get_revenue_by_restaurant():
     ]
 
     return list(db.orders.aggregate(pipeline))
+
+def get_top_selling_products():
+
+    pipeline = [
+        {
+            "$unwind": "$items"
+        },
+        {
+            "$group": {
+                "_id": "$items.name",
+                "totalQuantitySold": {"$sum": "$items.quantity"},
+                "totalRevenue": {"$sum": "$items.subtotal"}
+            }
+        },
+        {
+            "$project": {
+                "_id": 0,
+                "product": "$_id",
+                "totalQuantitySold": 1,
+                "totalRevenue": 1
+            }
+        },
+        {
+            "$sort": {"totalQuantitySold": -1}
+        }
+    ]
+
+    return list(db.orders.aggregate(pipeline))
