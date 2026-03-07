@@ -1108,6 +1108,5 @@ Departamento de Ciencias de la Computación
 
 <div align="center">
   <p><strong>Universidad del Valle de Guatemala</strong></p>
-  <p>CC3089 - Base de Datos 2 | Semestre I 2026</p>
-  <p>Docente: Mario Barrientos</p>
+  <p>Base de Datos 2 | Semestre I 2026</p>
 </div>
