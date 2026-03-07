@@ -35,3 +35,70 @@ def create_order(data: dict):
 
     result = db.orders.insert_one(order)
     return str(result.inserted_id)
+
+def get_all_orders(restaurantId=None, status=None, limit=10, skip=0):
+
+    match_stage = {}
+
+    if restaurantId:
+        match_stage["restaurantId"] = ObjectId(restaurantId)
+
+    if status:
+        match_stage["status"] = status
+
+    pipeline = []
+
+    if match_stage:
+        pipeline.append({"$match": match_stage})
+
+    pipeline.extend([
+        {
+            "$lookup": {
+                "from": "users",
+                "localField": "userId",
+                "foreignField": "_id",
+                "as": "user"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "restaurants",
+                "localField": "restaurantId",
+                "foreignField": "_id",
+                "as": "restaurant"
+            }
+        },
+        {"$unwind": "$user"},
+        {"$unwind": "$restaurant"},
+        {
+            "$project": {
+                "_id": 1,
+                "user.name": 1,
+                "restaurant.name": 1,
+                "items": 1,
+                "total": 1,
+                "status": 1,
+                "orderDate": 1
+            }
+        },
+        {"$sort": {"orderDate": -1}},
+        {"$skip": skip},
+        {"$limit": limit}
+    ])
+
+    orders = list(db.orders.aggregate(pipeline))
+
+    for order in orders:
+        order["_id"] = str(order["_id"])
+
+    return orders
+
+def get_order_by_id(order_id: str):
+    order = db.orders.find_one({"_id": ObjectId(order_id)})
+
+    if order:
+        order["_id"] = str(order["_id"])
+        order["userId"] = str(order["userId"])
+        order["restaurantId"] = str(order["restaurantId"])
+
+    return order
