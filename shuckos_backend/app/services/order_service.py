@@ -162,3 +162,35 @@ def get_top_selling_products():
     ]
 
     return list(db.orders.aggregate(pipeline))
+
+def get_average_ticket_by_restaurant():
+
+    pipeline = [
+        {
+            "$group": {
+                "_id": "$restaurantId",
+                "averageTicket": {"$avg": "$total"},
+                "totalOrders": {"$sum": 1}
+            }
+        },
+        {
+            "$lookup": {
+                "from": "restaurants",
+                "localField": "_id",
+                "foreignField": "_id",
+                "as": "restaurant"
+            }
+        },
+        {"$unwind": "$restaurant"},
+        {
+            "$project": {
+                "_id": 0,
+                "restaurant": "$restaurant.name",
+                "averageTicket": {"$round": ["$averageTicket", 2]},
+                "totalOrders": 1
+            }
+        },
+        {"$sort": {"averageTicket": -1}}
+    ]
+
+    return list(db.orders.aggregate(pipeline))
