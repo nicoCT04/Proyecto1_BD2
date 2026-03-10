@@ -7,28 +7,32 @@ from pymongo.errors import ConnectionFailure, OperationFailure
 
 def create_review(data: dict):
     def callback(session):
-        user_id = ObjectId(data["userId"])
-        restaurant_id = ObjectId(data["restaurantId"])
-        order_id = ObjectId(data["orderId"])
+        user_id = ObjectId(data["user"])
+        restaurant_id = ObjectId(data["restaurant"])
+        order_id_str = data.get("orderId")
         rating = data["rating"]
 
-        # 1. Verificar que la orden exista y pertenezca al usuario
-        order = db.orders.find_one(
-            {
-                "_id": order_id,
-                "userId": user_id,
-                "restaurantId": restaurant_id
-            },
-            session=session
-        )
+        # 1. Verificar que la orden exista y pertenezca al usuario (Opcional si viene orderId)
+        if order_id_str:
+            order_id = ObjectId(order_id_str)
+            order = db.orders.find_one(
+                {
+                    "_id": order_id,
+                    "userId": user_id,
+                    "restaurantId": restaurant_id
+                },
+                session=session
+            )
 
-        if not order:
-            raise Exception("Compra no válida para review")
+            if not order:
+                raise Exception("Compra no válida para review")
 
-        # 2. Evitar duplicados: una reseña por orden
-        existing_review = db.reviews.find_one({"orderId": order_id}, session=session)
-        if existing_review:
-            raise Exception("Ya existe una reseña para esta orden")
+            # 2. Evitar duplicados: una reseña por orden
+            existing_review = db.reviews.find_one({"orderId": order_id}, session=session)
+            if existing_review:
+                raise Exception("Ya existe una reseña para esta orden")
+        else:
+            order_id = None
 
         # 3. Insertar la reseña
         review = {
@@ -37,7 +41,7 @@ def create_review(data: dict):
             "orderId": order_id,
             "rating": rating,
             "comment": data.get("comment"),
-            "verifiedPurchase": True,
+            "verifiedPurchase": True if order_id else False,
             "createdAt": datetime.utcnow()
         }
         db.reviews.insert_one(review, session=session)
@@ -85,11 +89,11 @@ def serialize_review(review: dict):
         "_id": str(review["_id"]),
         "userId": str(review["userId"]),
         "restaurantId": str(review["restaurantId"]),
-        "orderId": str(review["orderId"]),
+        "orderId": str(review["orderId"]) if review.get("orderId") else None,
         "rating": review["rating"],
         "comment": review.get("comment"),
-        "verifiedPurchase": review["verifiedPurchase"],
-        "createdAt": review["createdAt"].isoformat()
+        "verifiedPurchase": review.get("verifiedPurchase", False),
+        "createdAt": review["createdAt"].isoformat() if isinstance(review["createdAt"], datetime) else review["createdAt"]
     }
 
 def get_all_reviews():

@@ -27,7 +27,7 @@ class MenuItemBase(BaseModel):
     available: bool = True
 
 class MenuItemCreate(MenuItemBase):
-    restaurantId: str
+    restaurant: str # Mapped from restaurantId for frontend compatibility
 
 class MenuItemResponse(MenuItemBase):
     id: str
@@ -59,19 +59,28 @@ class OrderItem(BaseModel):
     quantity: int
 
 class OrderCreate(BaseModel):
-    userId: str
-    restaurantId: str
+    user: str # userId
+    restaurant: str # restaurantId
     items: List[OrderItem]
+    totalAmount: Optional[float] = None
+    status: Optional[str] = "pending"
 
 class ReviewCreate(BaseModel):
-    userId: str
-    restaurantId: str
-    orderId: str
+    user: str # userId
+    restaurant: str # restaurantId
+    orderId: Optional[str] = None
     rating: int = Field(..., ge=1, le=5)
     comment: Optional[str] = None
 
+class InspectionScores(BaseModel):
+    foodHandling: int = Field(..., ge=0, le=100)
+    surfaceCleanliness: int = Field(..., ge=0, le=100)
+    staffHygiene: int = Field(..., ge=0, le=100)
+
 class InspectionCreate(BaseModel):
-    restaurantId: str
-    inspectorId: str
-    score: int = Field(..., ge=0, le=10)
+    restaurant: str # Mapped to restaurantId
+    inspectorId: Optional[str] = None
+    scores: InspectionScores
+    overallScore: int = Field(..., ge=0, le=100)
     observations: Optional[str] = None
+    inspectionDate: Optional[datetime] = None

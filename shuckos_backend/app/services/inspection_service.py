@@ -6,16 +6,17 @@ from pymongo.write_concern import WriteConcern
 
 def create_inspection(data: dict):
     def callback(session):
-        restaurant_id = ObjectId(data["restaurantId"])
-        inspector_id = ObjectId(data["inspectorId"])
-        score = data["score"]
+        restaurant_id = ObjectId(data["restaurant"])
+        inspector_id = ObjectId(data["inspectorId"]) if data.get("inspectorId") else None
+        overall_score = data["overallScore"]
 
         inspection = {
             "restaurantId": restaurant_id,
             "inspectorId": inspector_id,
-            "score": score,
+            "scores": data["scores"],
+            "overallScore": overall_score,
             "observations": data.get("observations"),
-            "inspectionDate": datetime.utcnow()
+            "inspectionDate": data.get("inspectionDate") or datetime.utcnow()
         }
 
         db.quality_inspections.insert_one(inspection, session=session)
@@ -26,7 +27,7 @@ def create_inspection(data: dict):
             {
                 "$group": {
                     "_id": "$restaurantId",
-                    "avgScore": {"$avg": "$score"}
+                    "avgScore": {"$avg": "$overallScore"}
                 }
             }
         ]
@@ -36,7 +37,10 @@ def create_inspection(data: dict):
         if result:
             db.restaurants.update_one(
                 {"_id": restaurant_id},
-                {"$set": {"averageQualityScore": round(result[0]["avgScore"], 2)}},
+                {"$set": {
+                    "averageQualityScore": round(result[0]["avgScore"], 2),
+                    "averageCleanliness": round(result[0]["avgScore"], 2) # Sincronizar para el frontend
+                }},
                 session=session
             )
 
@@ -56,8 +60,9 @@ def serialize_inspection(inspection: dict):
     return {
         "_id": str(inspection["_id"]),
         "restaurantId": str(inspection["restaurantId"]),
-        "inspectorId": str(inspection["inspectorId"]),
-        "score": inspection["score"],
+        "inspectorId": str(inspection["inspectorId"]) if inspection.get("inspectorId") else None,
+        "scores": inspection.get("scores"),
+        "overallScore": inspection.get("overallScore"),
         "observations": inspection.get("observations"),
         "inspectionDate": inspection["inspectionDate"].isoformat()
     }
