@@ -1,7 +1,8 @@
 from app.database import client, db
 from bson import ObjectId
 from datetime import datetime
-from pymongo import WriteConcern, ReadConcern
+from pymongo.read_concern import ReadConcern
+from pymongo.write_concern import WriteConcern
 
 def create_inspection(data: dict):
     def callback(session):

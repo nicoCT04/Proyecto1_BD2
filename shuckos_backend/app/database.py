@@ -1,4 +1,4 @@
-from pymongo import MongoClient, WriteConcern, ReadPreference
+from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
 
@@ -15,9 +15,7 @@ client = MongoClient(
     minPoolSize=10,
     # Tiempo de espera para evitar bloqueos infinitos
     serverSelectionTimeoutMS=5000,
-    # Consistencia mayoritaria por defecto para seguridad de datos
     retryWrites=True,
-    writeConcern=WriteConcern(w="majority")
 )
 
 db = client[DATABASE_NAME]

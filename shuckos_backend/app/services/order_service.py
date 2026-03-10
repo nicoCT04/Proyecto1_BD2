@@ -2,7 +2,8 @@ from app.database import db, client
 from bson import ObjectId
 from bson.json_util import dumps
 from datetime import datetime
-from pymongo import WriteConcern, ReadConcern
+from pymongo.read_concern import ReadConcern
+from pymongo.write_concern import WriteConcern
 from pymongo.errors import ConnectionFailure, OperationFailure
 import json
 
