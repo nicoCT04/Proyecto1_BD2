@@ -2,16 +2,22 @@ from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional
 from datetime import datetime
 
+class Location(BaseModel):
+    type: str = "Point"
+    coordinates: List[float]
+
 class UserBase(BaseModel):
     name: str
     email: EmailStr
     role: str = "customer"
+    location: Optional[Location] = None
 
 class UserCreate(UserBase):
-    password: str
+    password: Optional[str] = None
 
 class UserResponse(UserBase):
     id: str
+    createdAt: datetime
 
 class MenuItemBase(BaseModel):
     name: str
@@ -30,8 +36,11 @@ class MenuItemResponse(MenuItemBase):
 
 class RestaurantBase(BaseModel):
     name: str
-    address: str
-    cuisineType: str
+    address: Optional[str] = None
+    cuisineType: Optional[str] = None
+    description: Optional[str] = None
+    tags: Optional[List[str]] = None
+    location: Optional[Location] = None
 
 class RestaurantCreate(RestaurantBase):
     pass
@@ -40,6 +49,7 @@ class RestaurantResponse(RestaurantBase):
     id: str
     totalOrders: int = 0
     averageRating: float = 0.0
+    rating: float = 0.0 # Map from averageRating
     totalReviews: int = 0
     averageQualityScore: float = 0.0
 

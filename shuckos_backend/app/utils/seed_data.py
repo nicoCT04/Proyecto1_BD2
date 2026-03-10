@@ -128,6 +128,7 @@ def generate_full_dataset(restaurant_id: str, user_id: str):
             {
                 "$set": {
                     "averageRating": review_stats[0]["avgRating"],
+                    "rating": review_stats[0]["avgRating"], # Alias para el frontend
                     "totalReviews": review_stats[0]["totalReviews"]
                 }
             }

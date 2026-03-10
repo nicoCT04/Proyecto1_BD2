@@ -9,12 +9,15 @@ def get_all_restaurants():
     restaurants = list(db.restaurants.find())
     for r in restaurants:
         r["_id"] = str(r["_id"])
+        # Mapear averageRating a rating para compatibilidad con el frontend
+        r["rating"] = r.get("averageRating", 0)
     return restaurants
 
 def get_restaurant_by_id(restaurant_id: str):
     restaurant = db.restaurants.find_one({"_id": ObjectId(restaurant_id)})
     if restaurant:
         restaurant["_id"] = str(restaurant["_id"])
+        restaurant["rating"] = restaurant.get("averageRating", 0)
     return restaurant
 
 def update_restaurant(restaurant_id: str, data: dict):

@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.routes import users
 from app.routes import restaurant
 from app.routes import orders
@@ -18,18 +19,28 @@ app = FastAPI(
    version="1.0.0"
 )
 
-#http://127.0.0.1:8000/swagger
+# Configuración de CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-app.include_router(users.router)
-app.include_router(restaurant.router)
-app.include_router(menu_items.router)
-app.include_router(orders.router)
-app.include_router(admin.router)
-app.include_router(reviews.router)
-app.include_router(visits.router)
-app.include_router(analytics.router)
-app.include_router(inspection.router)
-app.include_router(files.router)
+# http://127.0.0.1:8000/swagger
+
+# Incluir routers con prefijo /api para coincidir con el frontend
+app.include_router(users.router, prefix="/api")
+app.include_router(restaurant.router, prefix="/api")
+app.include_router(menu_items.router, prefix="/api")
+app.include_router(orders.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
+app.include_router(reviews.router, prefix="/api")
+app.include_router(visits.router, prefix="/api")
+app.include_router(analytics.router, prefix="/api")
+app.include_router(inspection.router, prefix="/api")
+app.include_router(files.router, prefix="/api")
 
 @app.get("/")
 def root():

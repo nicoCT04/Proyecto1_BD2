@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev:api": "tsx server.ts",
+    "dev:api": "cd ../shuckos_backend && ./venv/bin/uvicorn app.main:app --reload",
     "dev:client": "vite",
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:client\"",
     "build": "vite build",

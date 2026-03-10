@@ -116,7 +116,7 @@ def get_all_orders(restaurantId=None, status=None, limit=10, skip=0):
                 "from": "users",
                 "localField": "userId",
                 "foreignField": "_id",
-                "as": "user"
+                "as": "userDetails"
             }
         },
         {
@@ -124,18 +124,18 @@ def get_all_orders(restaurantId=None, status=None, limit=10, skip=0):
                 "from": "restaurants",
                 "localField": "restaurantId",
                 "foreignField": "_id",
-                "as": "restaurant"
+                "as": "restaurantDetails"
             }
         },
-        {"$unwind": "$user"},
-        {"$unwind": "$restaurant"},
+        {"$unwind": "$userDetails"},
+        {"$unwind": "$restaurantDetails"},
         {
             "$project": {
                 "_id": 1,
-                "user.name": 1,
-                "restaurant.name": 1,
+                "userDetails.name": 1,
+                "restaurantDetails.name": 1,
                 "items": 1,
-                "total": 1,
+                "totalAmount": "$total",
                 "status": 1,
                 "orderDate": 1
             }

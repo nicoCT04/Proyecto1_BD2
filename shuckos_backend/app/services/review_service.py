@@ -61,7 +61,8 @@ def create_review(data: dict):
             {
                 "$set": {
                     "averageRating": round(new_avg, 2),
-                    "totalReviews": new_total
+                    "totalReviews": new_total,
+                    "rating": round(new_avg, 2) # Sincronizar campo rating para el frontend
                 }
             },
             session=session
@@ -134,7 +135,8 @@ def delete_review(review_id: str):
                     {
                         "$set": {
                             "averageRating": round(result[0]["avgRating"], 2),
-                            "totalReviews": result[0]["totalReviews"]
+                            "totalReviews": result[0]["totalReviews"],
+                            "rating": round(result[0]["avgRating"], 2)
                         }
                     },
                     session=session
@@ -145,7 +147,8 @@ def delete_review(review_id: str):
                     {
                         "$set": {
                             "averageRating": 0,
-                            "totalReviews": 0
+                            "totalReviews": 0,
+                            "rating": 0
                         }
                     },
                     session=session
@@ -186,7 +189,8 @@ def delete_many_reviews(filter_query: dict):
                 {
                     "$set": {
                         "averageRating": round(agg_result[0]["avgRating"], 2),
-                        "totalReviews": agg_result[0]["totalReviews"]
+                        "totalReviews": agg_result[0]["totalReviews"],
+                        "rating": round(agg_result[0]["avgRating"], 2)
                     }
                 }
             )
@@ -196,7 +200,8 @@ def delete_many_reviews(filter_query: dict):
                 {
                     "$set": {
                         "averageRating": 0,
-                        "totalReviews": 0
+                        "totalReviews": 0,
+                        "rating": 0
                     }
                 }
             )
