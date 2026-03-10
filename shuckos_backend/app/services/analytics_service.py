@@ -1,48 +1,66 @@
 from app.database import db
 
 def get_conversion_rate_by_restaurant():
-
-    visits_pipeline = [
+    """
+    Calcula la tasa de conversión (Pedidos / Visitas) utilizando un pipeline de agregación único.
+    Este enfoque es altamente escalable ya que MongoDB procesa la unión de datos de forma nativa.
+    """
+    pipeline = [
+        # 1. Agrupar visitas por restaurante
         {
             "$group": {
                 "_id": "$restaurantId",
                 "totalVisits": {"$sum": 1}
             }
-        }
-    ]
-
-    orders_pipeline = [
+        },
+        # 2. Unir con la colección de órdenes (lookup de alta eficiencia)
         {
-            "$group": {
-                "_id": "$restaurantId",
-                "totalOrders": {"$sum": 1}
+            "$lookup": {
+                "from": "orders",
+                "let": {"restId": "$_id"},
+                "pipeline": [
+                    {"$match": {"$expr": {"$eq": ["$restaurantId", "$$restId"]}}},
+                    {"$count": "count"}
+                ],
+                "as": "orderCountData"
             }
-        }
+        },
+        # 3. Procesar el conteo de órdenes
+        {
+            "$addFields": {
+                "totalOrders": {
+                    "$ifNull": [{"$arrayElemAt": ["$orderCountData.count", 0]}, 0]
+                }
+            }
+        },
+        # 4. Unir con el nombre del restaurante
+        {
+            "$lookup": {
+                "from": "restaurants",
+                "localField": "_id",
+                "foreignField": "_id",
+                "as": "restaurantData"
+            }
+        },
+        {"$unwind": "$restaurantData"},
+        # 5. Calcular la tasa de conversión final y proyectar campos
+        {
+            "$project": {
+                "_id": 0,
+                "restaurant": "$restaurantData.name",
+                "totalVisits": 1,
+                "totalOrders": 1,
+                "conversionRate": {
+                    "$cond": [
+                        {"$gt": ["$totalVisits", 0]},
+                        {"$round": [{"$multiply": [{"$divide": ["$totalOrders", "$totalVisits"]}, 100]}, 2]},
+                        0
+                    ]
+                }
+            }
+        },
+        # 6. Ordenar por tasa de conversión descendente
+        {"$sort": {"conversionRate": -1}}
     ]
 
-    visits = list(db.restaurant_visits.aggregate(visits_pipeline))
-    orders = list(db.orders.aggregate(orders_pipeline))
-
-    visits_dict = {v["_id"]: v["totalVisits"] for v in visits}
-    orders_dict = {o["_id"]: o["totalOrders"] for o in orders}
-
-    results = []
-
-    for restaurant_id, total_visits in visits_dict.items():
-        total_orders = orders_dict.get(restaurant_id, 0)
-
-        conversion_rate = (
-            (total_orders / total_visits) * 100
-            if total_visits > 0 else 0
-        )
-
-        restaurant = db.restaurants.find_one({"_id": restaurant_id})
-
-        results.append({
-            "restaurant": restaurant["name"],
-            "totalVisits": total_visits,
-            "totalOrders": total_orders,
-            "conversionRate": round(conversion_rate, 2)
-        })
-
-    return results
+    return list(db.restaurant_visits.aggregate(pipeline))

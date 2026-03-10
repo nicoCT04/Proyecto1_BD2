@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, HTTPException
 from app.services.review_service import (
     create_review,
     get_all_reviews,
@@ -6,12 +6,16 @@ from app.services.review_service import (
     delete_review,
     delete_many_reviews
 )
+from app.schemas.all_schemas import ReviewCreate
 
 router = APIRouter(prefix="/reviews", tags=["Reviews"])
 
 @router.post("/")
-def create_review_route(data: dict = Body(...)):
-    return create_review(data)
+def create_review_route(review: ReviewCreate):
+    try:
+        return create_review(review.dict())
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/")
 def get_reviews_route():

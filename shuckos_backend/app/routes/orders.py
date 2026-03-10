@@ -1,14 +1,21 @@
-from fastapi import APIRouter, Body, Query
+from fastapi import APIRouter, Body, Query, HTTPException
 from app.services.order_service import( 
     create_order, get_all_orders, get_order_by_id, 
     get_revenue_by_restaurant, get_top_selling_products, 
-    get_average_ticket_by_restaurant, explain_orders_by_restaurant)
+    get_average_ticket_by_restaurant, explain_orders_by_restaurant,
+    update_order_status)
+from app.schemas.all_schemas import OrderCreate
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
 @router.post("/")
-def create_order_route(data: dict = Body(...)):
-    return {"id": create_order(data)}
+def create_order_route(order: OrderCreate):
+    try:
+        # Pydantic valida automáticamente el cuerpo aquí
+        order_id = create_order(order.dict())
+        return {"id": order_id}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/")
 def get_orders_route(
@@ -22,7 +29,20 @@ def get_orders_route(
 
 @router.get("/{order_id}")
 def get_order_route(order_id: str):
-    return get_order_by_id(order_id)
+    order = get_order_by_id(order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Orden no encontrada")
+    return order
+
+@router.patch("/{order_id}/status")
+def update_status_route(order_id: str, data: dict = Body(...)):
+    try:
+        new_status = data.get("status")
+        return update_order_status(order_id, new_status)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 @router.get("/analytics/revenue")
 def revenue_by_restaurant():

@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Body
+from fastapi import APIRouter
 from app.services.user_service import create_user, get_all_users
+from app.schemas.all_schemas import UserCreate
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
 @router.post("/")
-def create_user_route(user: dict = Body(...)):
-   user_id = create_user(user)
+def create_user_route(user: UserCreate):
+   user_id = create_user(user.dict())
    return {"id": user_id}
 
 @router.get("/")

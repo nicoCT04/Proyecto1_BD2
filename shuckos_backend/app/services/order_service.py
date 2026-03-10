@@ -2,60 +2,97 @@ from app.database import db, client
 from bson import ObjectId
 from bson.json_util import dumps
 from datetime import datetime
+from pymongo import WriteConcern, ReadConcern
+from pymongo.errors import ConnectionFailure, OperationFailure
 import json
 
+VALID_STATUSES = ["pending", "confirmed", "preparing", "delivered", "cancelled"]
+
 def create_order(data: dict):
+    # Definir la lógica de la transacción
+    def callback(session):
+        user_id = ObjectId(data["userId"])
+        restaurant_id = ObjectId(data["restaurantId"])
+        items_input = data["items"]
 
-    with client.start_session() as session:
-        with session.start_transaction():
+        items = []
+        total = 0
 
-            user_id = ObjectId(data["userId"])
-            restaurant_id = ObjectId(data["restaurantId"])
-            items_input = data["items"]
+        for item in items_input:
+            price = item["price"]
+            quantity = item["quantity"]
+            subtotal = price * quantity
 
-            items = []
-            total = 0
+            items.append({
+                "name": item["name"],
+                "price": price,
+                "quantity": quantity,
+                "subtotal": subtotal
+            })
 
-            for item in items_input:
-                price = item["price"]
-                quantity = item["quantity"]
-                subtotal = price * quantity
+            total += subtotal
 
-                items.append({
-                    "name": item["name"],
-                    "price": price,
-                    "quantity": quantity,
-                    "subtotal": subtotal
-                })
-
-                total += subtotal
-
-                #  Actualizar contador en menu_items
-                db.menu_items.update_one(
-                    {"name": item["name"], "restaurantId": restaurant_id},
-                    {"$inc": {"timesOrdered": quantity}},
-                    session=session
-                )
-
-            order = {
-                "userId": user_id,
-                "restaurantId": restaurant_id,
-                "items": items,
-                "total": total,
-                "status": "pending",
-                "orderDate": datetime.utcnow()
-            }
-
-            result = db.orders.insert_one(order, session=session)
-
-            #  Actualizar métrica en restaurante
-            db.restaurants.update_one(
-                {"_id": restaurant_id},
-                {"$inc": {"totalOrders": 1}},
+            # Actualizar contador en menu_items (concurrencia manejada por MongoDB)
+            db.menu_items.update_one(
+                {"name": item["name"], "restaurantId": restaurant_id},
+                {"$inc": {"timesOrdered": quantity}},
                 session=session
             )
 
-            return str(result.inserted_id)
+        order = {
+            "userId": user_id,
+            "restaurantId": restaurant_id,
+            "items": items,
+            "total": total,
+            "status": "pending",
+            "orderDate": datetime.utcnow()
+        }
+
+        result = db.orders.insert_one(order, session=session)
+
+        # Actualizar métrica en restaurante - Alta frecuencia de actualización
+        # En producción real, esto podría ser eventual o mediante buckets
+        db.restaurants.update_one(
+            {"_id": restaurant_id},
+            {"$inc": {"totalOrders": 1}},
+            session=session
+        )
+
+        return str(result.inserted_id)
+
+    # Iniciar sesión con configuraciones de consistencia fuerte
+    with client.start_session() as session:
+        # Usar with_transaction para reintentos automáticos
+        try:
+            order_id = session.with_transaction(
+                callback,
+                read_concern=ReadConcern("majority"),
+                write_concern=WriteConcern("majority")
+            )
+            return order_id
+        except (ConnectionFailure, OperationFailure) as e:
+            # Log error y manejar rollback implícito
+            raise Exception(f"Error transaccional al crear orden: {str(e)}")
+
+def update_order_status(order_id: str, new_status: str):
+    if new_status not in VALID_STATUSES:
+        raise ValueError("Estado no válido")
+    
+    # Validaciones de integridad de estado (State Machine)
+    # Ejemplo: No pasar de delivered a pending
+    order = db.orders.find_one({"_id": ObjectId(order_id)})
+    if not order:
+        raise Exception("Orden no encontrada")
+    
+    current_status = order["status"]
+    if current_status == "delivered" or current_status == "cancelled":
+        raise Exception(f"No se puede cambiar el estado de una orden {current_status}")
+
+    db.orders.update_one(
+        {"_id": ObjectId(order_id)},
+        {"$set": {"status": new_status, "updatedAt": datetime.utcnow()}}
+    )
+    return {"message": f"Estado actualizado a {new_status}"}
 
 def get_all_orders(restaurantId=None, status=None, limit=10, skip=0):
 

@@ -8,12 +8,13 @@ from app.services.restaurant_service import (
     update_many_restaurants,
     delete_many_restaurants
 )
+from app.schemas.all_schemas import RestaurantCreate
 
 router = APIRouter(prefix="/restaurants", tags=["Restaurants"])
 
 @router.post("/")
-def create_restaurant_route(data: dict = Body(...)):
-    return {"id": create_restaurant(data)}
+def create_restaurant_route(restaurant: RestaurantCreate):
+    return {"id": create_restaurant(restaurant.dict())}
 
 @router.get("/")
 def get_restaurants_route():

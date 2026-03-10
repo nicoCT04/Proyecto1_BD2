@@ -1,48 +1,55 @@
 from app.database import client, db
 from bson import ObjectId
 from datetime import datetime
+from pymongo import WriteConcern, ReadConcern
 
 def create_inspection(data: dict):
+    def callback(session):
+        restaurant_id = ObjectId(data["restaurantId"])
+        inspector_id = ObjectId(data["inspectorId"])
+        score = data["score"]
+
+        inspection = {
+            "restaurantId": restaurant_id,
+            "inspectorId": inspector_id,
+            "score": score,
+            "observations": data.get("observations"),
+            "inspectionDate": datetime.utcnow()
+        }
+
+        db.quality_inspections.insert_one(inspection, session=session)
+
+        # Recalcular promedio de calidad de forma consistente
+        pipeline = [
+            {"$match": {"restaurantId": restaurant_id}},
+            {
+                "$group": {
+                    "_id": "$restaurantId",
+                    "avgScore": {"$avg": "$score"}
+                }
+            }
+        ]
+
+        result = list(db.quality_inspections.aggregate(pipeline, session=session))
+
+        if result:
+            db.restaurants.update_one(
+                {"_id": restaurant_id},
+                {"$set": {"averageQualityScore": round(result[0]["avgScore"], 2)}},
+                session=session
+            )
+
+        return {"message": "Inspection registrada correctamente"}
 
     with client.start_session() as session:
-        with session.start_transaction():
-
-            restaurant_id = ObjectId(data["restaurantId"])
-            inspector_id = ObjectId(data["inspectorId"])
-
-            score = data["score"]
-
-            inspection = {
-                "restaurantId": restaurant_id,
-                "inspectorId": inspector_id,
-                "score": score,
-                "observations": data.get("observations"),
-                "inspectionDate": datetime.utcnow()
-            }
-
-            db.quality_inspections.insert_one(inspection, session=session)
-
-            # Recalcular promedio de calidad
-            pipeline = [
-                {"$match": {"restaurantId": restaurant_id}},
-                {
-                    "$group": {
-                        "_id": "$restaurantId",
-                        "avgScore": {"$avg": "$score"}
-                    }
-                }
-            ]
-
-            result = list(db.quality_inspections.aggregate(pipeline))
-
-            if result:
-                db.restaurants.update_one(
-                    {"_id": restaurant_id},
-                    {"$set": {"averageQualityScore": result[0]["avgScore"]}},
-                    session=session
-                )
-
-            return {"message": "Inspection registrada correctamente"}
+        try:
+            return session.with_transaction(
+                callback,
+                read_concern=ReadConcern("majority"),
+                write_concern=WriteConcern("majority")
+            )
+        except Exception as e:
+            raise Exception(f"Error en inspección: {str(e)}")
         
 def serialize_inspection(inspection: dict):
     return {

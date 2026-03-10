@@ -1,15 +1,16 @@
-from fastapi import APIRouter, Body
+from fastapi import APIRouter
 from app.services.menu_item_service import (
     create_menu_item,
     get_menu_items,
     get_menu_items_by_restaurant
 )
+from app.schemas.all_schemas import MenuItemCreate
 
 router = APIRouter(prefix="/menu-items", tags=["Menu Items"])
 
 @router.post("/")
-def create_item(data: dict = Body(...)):
-    return {"id": create_menu_item(data)}
+def create_item(item: MenuItemCreate):
+    return {"id": create_menu_item(item.dict())}
 
 @router.get("/")
 def get_items():
