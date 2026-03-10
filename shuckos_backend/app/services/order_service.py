@@ -12,8 +12,8 @@ VALID_STATUSES = ["pending", "confirmed", "preparing", "delivered", "cancelled"]
 def create_order(data: dict):
     # Definir la lógica de la transacción
     def callback(session):
-        user_id = ObjectId(data["userId"])
-        restaurant_id = ObjectId(data["restaurantId"])
+        user_id = ObjectId(data["user"])
+        restaurant_id = ObjectId(data["restaurant"])
         items_input = data["items"]
 
         items = []
@@ -45,14 +45,13 @@ def create_order(data: dict):
             "restaurantId": restaurant_id,
             "items": items,
             "total": total,
-            "status": "pending",
+            "status": data.get("status") or "pending",
             "orderDate": datetime.utcnow()
         }
 
         result = db.orders.insert_one(order, session=session)
 
         # Actualizar métrica en restaurante - Alta frecuencia de actualización
-        # En producción real, esto podría ser eventual o mediante buckets
         db.restaurants.update_one(
             {"_id": restaurant_id},
             {"$inc": {"totalOrders": 1}},
