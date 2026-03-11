@@ -1,7 +1,6 @@
-from app.database import db
+from app.database import db, async_db
 from bson import ObjectId
 from datetime import datetime, timedelta
-from pymongo import InsertOne
 import random
 
 VISIT_CAP = 15000
@@ -13,6 +12,12 @@ BATCH_SIZE = 1000
 RESTAURANT_NAMES = [
     "La Mariscada", "El Fogón", "Sabor Oriental", "Pizzería Roma", "Tacos & Más",
     "Café Central", "Sushi Bar", "Parrilla del Sur", "Vegetariano Verde", "Dulce Tentación",
+]
+
+SHUKOS_NAMES = [
+    "Shukos Centro", "Shukos Zona 10", "Shukos Oakland", "Shukos Pradera",
+    "Shukos Metrocentro", "Shukos Miraflores", "Shukos Cayalá", "Shukos Tikal",
+    "Shukos Portales", "Shukos Periférico",
 ]
 
 MENU_CATEGORIES = {
@@ -61,7 +66,7 @@ def _ensure_restaurants() -> list:
         })
     if to_create:
         result = db.restaurants.insert_many(to_create)
-        return [r["_id"] for r in existing] + list(result.inserted_id)
+        return [r["_id"] for r in existing] + list(result.inserted_ids)
     return [r["_id"] for r in existing]
 
 
@@ -83,7 +88,7 @@ def _ensure_users(count: int = 50) -> list:
         for i in range(count - len(existing))
     ]
     result = db.users.insert_many(to_create)
-    return list(result.inserted_id) + [u["_id"] for u in existing]
+    return list(result.inserted_ids) + [u["_id"] for u in existing]
 
 
 def _ensure_menu_items(restaurant_ids: list) -> dict:
@@ -115,6 +120,7 @@ def _ensure_menu_items(restaurant_ids: list) -> dict:
 
 
 def generate_full_dataset(restaurant_id: str = None, user_id: str = None):
+    from pymongo import InsertOne
     restaurant_ids = _ensure_restaurants()
     user_ids = _ensure_users(50)
     menu_by_rest = _ensure_menu_items(restaurant_ids)
@@ -271,4 +277,166 @@ def generate_full_dataset(restaurant_id: str = None, user_id: str = None):
         "orders": db.orders.count_documents({}),
         "reviews": db.reviews.count_documents({}),
         "inspections": db.quality_inspections.count_documents({}),
+    }
+
+
+MIN_ORDERS_PER_RESTAURANT = 30
+MAX_ORDERS_PER_RESTAURANT = 100
+ORDER_TOTAL_MIN = 25
+ORDER_TOTAL_MAX = 150
+REVIEWS_PER_RESTAURANT_MIN = 15
+REVIEWS_PER_RESTAURANT_MAX = 60
+INSPECTIONS_PER_RESTAURANT_MIN = 3
+INSPECTIONS_PER_RESTAURANT_MAX = 12
+
+
+def _random_date_async(days_back: int):
+    return datetime.utcnow() - timedelta(days=random.randint(0, days_back))
+
+
+async def _ensure_seed_users(count: int = 20):
+    existing = await async_db.users.find().limit(count).to_list(length=count)
+    if len(existing) >= count:
+        return [u["_id"] for u in existing]
+    base = datetime.utcnow().strftime("%Y%m%d%H%M")
+    to_create = [
+        {
+            "name": f"Cliente Seed {i + 1}",
+            "email": f"seed.{base}.{i}@example.com",
+            "phone": f"8765432{i % 10}",
+            "role": "client",
+            "isActive": True,
+            "createdAt": _random_date_async(365),
+        }
+        for i in range(count - len(existing))
+    ]
+    if to_create:
+        result = await async_db.users.insert_many(to_create)
+        return list(result.inserted_ids) + [u["_id"] for u in existing]
+    return [u["_id"] for u in existing]
+
+
+async def seed_full_dataset_async():
+    user_ids = await _ensure_seed_users(20)
+
+    restaurant_docs = []
+    for i, name in enumerate(SHUKOS_NAMES):
+        restaurant_docs.append({
+            "name": name,
+            "description": f"Comida rápida Shukos - {name}",
+            "location": {"type": "Point", "coordinates": [-90.52 + i * 0.008, 14.62 + i * 0.004]},
+            "address": {"street": "Av. Principal", "zone": f"Zona {((i % 10) + 1)}", "city": "Guatemala"},
+            "contact": {"phone": "12345678", "email": f"shukos{i}@shukos.com"},
+            "averageRating": 0.0,
+            "totalReviews": 0,
+            "totalOrders": 0,
+            "averageQualityScore": 0.0,
+            "averageCleanliness": 0.0,
+            "isActive": True,
+            "specialties": ["shukos", "comida rápida", "hamburguesas"],
+            "createdAt": datetime.utcnow(),
+        })
+
+    result_rest = await async_db.restaurants.insert_many(restaurant_docs)
+    restaurant_ids = list(result_rest.inserted_ids)
+
+    all_orders = []
+    for rid in restaurant_ids:
+        n_orders = random.randint(MIN_ORDERS_PER_RESTAURANT, MAX_ORDERS_PER_RESTAURANT)
+        for _ in range(n_orders):
+            total = round(random.uniform(ORDER_TOTAL_MIN, ORDER_TOTAL_MAX), 2)
+            all_orders.append({
+                "restaurantId": rid,
+                "userId": random.choice(user_ids),
+                "items": [{"name": "Combo Shukos", "price": total, "quantity": 1, "subtotal": total}],
+                "total": total,
+                "status": random.choice(["delivered", "delivered", "delivered", "pending", "cancelled"]),
+                "orderDate": _random_date_async(365),
+            })
+
+    if all_orders:
+        await async_db.orders.insert_many(all_orders)
+
+    all_reviews = []
+    for rid in restaurant_ids:
+        n_reviews = random.randint(REVIEWS_PER_RESTAURANT_MIN, REVIEWS_PER_RESTAURANT_MAX)
+        for _ in range(n_reviews):
+            rating = round(random.uniform(1.0, 5.0), 1)
+            all_reviews.append({
+                "restaurantId": rid,
+                "userId": random.choice(user_ids),
+                "orderId": None,
+                "rating": rating,
+                "comment": random.choice(REVIEW_COMMENTS),
+                "verifiedPurchase": random.choice([True, False]),
+                "createdAt": _random_date_async(180),
+            })
+
+    if all_reviews:
+        await async_db.reviews.insert_many(all_reviews)
+
+    all_inspections = []
+    for rid in restaurant_ids:
+        n_insp = random.randint(INSPECTIONS_PER_RESTAURANT_MIN, INSPECTIONS_PER_RESTAURANT_MAX)
+        for _ in range(n_insp):
+            food = random.randint(60, 100)
+            surface = random.randint(60, 100)
+            staff = random.randint(60, 100)
+            overall = round((food + surface + staff) / 3.0, 2)
+            all_inspections.append({
+                "restaurantId": rid,
+                "inspectorId": random.choice(user_ids),
+                "scores": {
+                    "foodHandling": food,
+                    "surfaceCleanliness": surface,
+                    "staffHygiene": staff,
+                },
+                "overallScore": overall,
+                "observations": "Inspección rutinaria.",
+                "inspectionDate": _random_date_async(365),
+            })
+
+    if all_inspections:
+        await async_db.quality_inspections.insert_many(all_inspections)
+
+    for rid in restaurant_ids:
+        review_cursor = async_db.reviews.aggregate([
+            {"$match": {"restaurantId": rid}},
+            {"$group": {"_id": None, "avgRating": {"$avg": "$rating"}, "totalReviews": {"$sum": 1}}},
+        ])
+        review_stats = await review_cursor.to_list(length=1)
+        order_count = await async_db.orders.count_documents({"restaurantId": rid})
+        insp_cursor = async_db.quality_inspections.aggregate([
+            {"$match": {"restaurantId": rid}},
+            {"$group": {"_id": None, "avgScore": {"$avg": "$overallScore"}}},
+        ])
+        insp_stats = await insp_cursor.to_list(length=1)
+
+        update = {
+            "totalOrders": order_count,
+            "averageRating": 0.0,
+            "totalReviews": 0,
+            "averageQualityScore": 0.0,
+            "averageCleanliness": 0.0,
+        }
+        if review_stats:
+            update["averageRating"] = round(review_stats[0]["avgRating"], 2)
+            update["totalReviews"] = review_stats[0]["totalReviews"]
+        if insp_stats:
+            score = round(insp_stats[0]["avgScore"], 2)
+            update["averageQualityScore"] = score
+            update["averageCleanliness"] = score
+
+        await async_db.restaurants.update_one({"_id": rid}, {"$set": update})
+
+    total_orders = await async_db.orders.count_documents({})
+    total_reviews = await async_db.reviews.count_documents({})
+    total_inspections = await async_db.quality_inspections.count_documents({})
+
+    return {
+        "message": "Seed full dataset completado",
+        "restaurants": len(restaurant_ids),
+        "orders": total_orders,
+        "reviews": total_reviews,
+        "inspections": total_inspections,
     }
