@@ -32,6 +32,7 @@ export default function RestaurantsTab() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRestaurant, setEditingRestaurant] = useState<any>(null);
+  const [specialtyInput, setSpecialtyInput] = useState('');
 
   const fetchRestaurants = async () => {
     setLoading(true);
@@ -160,7 +161,53 @@ export default function RestaurantsTab() {
       ...restaurant,
       tags: restaurant.tags?.join(', ') || ''
     });
+    setSpecialtyInput('');
     setIsModalOpen(true);
+  };
+
+  const refetchEditingRestaurant = async () => {
+    if (!editingRestaurant?._id) return;
+    try {
+      const res = await fetch(`/api/restaurants/${editingRestaurant._id}`);
+      const data = await res.json();
+      setEditingRestaurant({ ...data, tags: data.tags?.join(', ') || '' });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const addSpecialty = async () => {
+    if (!editingRestaurant?._id || !specialtyInput.trim()) return;
+    try {
+      const res = await fetch(`/api/arrays/restaurants/${editingRestaurant._id}/specialties`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ specialty: specialtyInput.trim() }),
+      });
+      if (res.ok) {
+        setSpecialtyInput('');
+        await refetchEditingRestaurant();
+      } else {
+        const data = await res.json();
+        alert(data.message || 'Error');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const removeSpecialty = async (specialty: string) => {
+    if (!editingRestaurant?._id) return;
+    try {
+      const res = await fetch(`/api/arrays/restaurants/${editingRestaurant._id}/specialties`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ specialty }),
+      });
+      if (res.ok) await refetchEditingRestaurant();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const fetchNearby = async () => {
@@ -486,6 +533,35 @@ export default function RestaurantsTab() {
                   onChange={e => setEditingRestaurant({...editingRestaurant, description: e.target.value})}
                   className="mt-1 block w-full border border-gray-300 rounded-md p-2 text-sm"
                 />
+              </div>
+              <div className="border-t border-gray-100 pt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Especialidades (arrays: $addToSet / $pull)</label>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={specialtyInput}
+                    onChange={e => setSpecialtyInput(e.target.value)}
+                    placeholder="Ej: comida rápida"
+                    className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  />
+                  <button type="button" onClick={addSpecialty} className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-md text-sm font-medium">
+                    <Plus size={14} /> Agregar
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {(editingRestaurant.specialties ?? []).length === 0 ? (
+                    <span className="text-gray-400 text-sm">Ninguna</span>
+                  ) : (
+                    (editingRestaurant.specialties ?? []).map((s: string) => (
+                      <span key={s} className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded text-sm">
+                        {s}
+                        <button type="button" onClick={() => removeSpecialty(s)} className="text-red-600 hover:text-red-800">
+                          <Trash2 size={12} />
+                        </button>
+                      </span>
+                    ))
+                  )}
+                </div>
               </div>
               <div className="flex gap-3">
                 <button 

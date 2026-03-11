@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { UtensilsCrossed, Plus, Store } from 'lucide-react';
+import { UtensilsCrossed, Plus, Store, Layers, Trash2, Tag } from 'lucide-react';
 
 export default function MenuItemsTab() {
   const [restaurants, setRestaurants] = useState<any[]>([]);
   const [selectedRestaurant, setSelectedRestaurant] = useState('');
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [ingredientInput, setIngredientInput] = useState('');
+  const [ingredientsMultiple, setIngredientsMultiple] = useState('');
+  const [tagInput, setTagInput] = useState('');
+  const [searchIngredient, setSearchIngredient] = useState('');
+  const [searchResults, setSearchResults] = useState<any[] | null>(null);
+  const [arrayMsg, setArrayMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
   // Form state
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
@@ -34,12 +41,113 @@ export default function MenuItemsTab() {
     try {
       const res = await fetch(`/api/menu-items/restaurant/${restId}`);
       const data = await res.json();
-      setMenuItems(data);
+      setMenuItems(Array.isArray(data) ? data : []);
+      if (selectedItem) {
+        const next = (Array.isArray(data) ? data : []).find((m: any) => m._id === selectedItem._id);
+        setSelectedItem(next ?? null);
+      }
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const refreshSelectedItem = () => {
+    if (!selectedItem?._id || !selectedRestaurant) return;
+    fetch(`/api/menu-items/restaurant/${selectedRestaurant}`)
+      .then(res => res.json())
+      .then(data => {
+        const list = Array.isArray(data) ? data : [];
+        const next = list.find((m: any) => m._id === selectedItem._id);
+        if (next) setSelectedItem(next);
+      });
+  };
+
+  const showArrayMsg = (type: 'ok' | 'err', text: string) => {
+    setArrayMsg({ type, text });
+    setTimeout(() => setArrayMsg(null), 3000);
+  };
+
+  const addIngredient = async () => {
+    if (!selectedItem?._id || !ingredientInput.trim()) return;
+    try {
+      const res = await fetch(`/api/arrays/menu-items/${selectedItem._id}/ingredients`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ingredient: ingredientInput.trim() }),
+      });
+      const data = await res.json();
+      showArrayMsg(res.ok ? 'ok' : 'err', data.message || (res.ok ? 'Agregado ($addToSet)' : 'Error'));
+      if (res.ok) { setIngredientInput(''); refreshSelectedItem(); }
+    } catch { showArrayMsg('err', 'Error de red'); }
+  };
+
+  const addMultipleIngredients = async () => {
+    if (!selectedItem?._id || !ingredientsMultiple.trim()) return;
+    const list = ingredientsMultiple.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+    if (list.length === 0) return;
+    try {
+      const res = await fetch(`/api/arrays/menu-items/${selectedItem._id}/ingredients/multiple`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ingredients: list }),
+      });
+      const data = await res.json();
+      showArrayMsg(res.ok ? 'ok' : 'err', data.message || (res.ok ? 'Agregados ($push+$each)' : 'Error'));
+      if (res.ok) { setIngredientsMultiple(''); refreshSelectedItem(); }
+    } catch { showArrayMsg('err', 'Error de red'); }
+  };
+
+  const removeIngredient = async (ing: string) => {
+    if (!selectedItem?._id) return;
+    try {
+      const res = await fetch(`/api/arrays/menu-items/${selectedItem._id}/ingredients`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ingredient: ing }),
+      });
+      const data = await res.json();
+      showArrayMsg(res.ok ? 'ok' : 'err', data.message || '');
+      if (res.ok) refreshSelectedItem();
+    } catch { showArrayMsg('err', 'Error de red'); }
+  };
+
+  const addTag = async () => {
+    if (!selectedItem?._id || !tagInput.trim()) return;
+    try {
+      const res = await fetch(`/api/arrays/menu-items/${selectedItem._id}/tags`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag: tagInput.trim() }),
+      });
+      const data = await res.json();
+      showArrayMsg(res.ok ? 'ok' : 'err', data.message || (res.ok ? 'Tag agregado' : 'Error'));
+      if (res.ok) { setTagInput(''); refreshSelectedItem(); }
+    } catch { showArrayMsg('err', 'Error de red'); }
+  };
+
+  const removeTag = async (tag: string) => {
+    if (!selectedItem?._id) return;
+    try {
+      const res = await fetch(`/api/arrays/menu-items/${selectedItem._id}/tags`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag }),
+      });
+      const data = await res.json();
+      showArrayMsg(res.ok ? 'ok' : 'err', data.message || '');
+      if (res.ok) refreshSelectedItem();
+    } catch { showArrayMsg('err', 'Error de red'); }
+  };
+
+  const searchByIngredient = async () => {
+    if (!searchIngredient.trim()) return;
+    try {
+      const res = await fetch(`/api/arrays/menu-items/by-ingredient/${encodeURIComponent(searchIngredient.trim())}`);
+      const data = await res.json();
+      setSearchResults(Array.isArray(data.items) ? data.items : []);
+    } catch { setSearchResults([]); showArrayMsg('err', 'Error al buscar'); }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -160,6 +268,7 @@ export default function MenuItemsTab() {
                   <th className="px-6 py-3">Nombre</th>
                   <th className="px-6 py-3 text-right">Precio</th>
                   <th className="px-6 py-3">GridFS</th>
+                  <th className="px-6 py-3">Arrays</th>
                 </tr>
               </thead>
               <tbody>
@@ -209,6 +318,16 @@ export default function MenuItemsTab() {
                         <span className="text-xs text-gray-400">N/A</span>
                       )}
                     </td>
+                    <td className="px-6 py-4">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedItem(selectedItem?._id === item._id ? null : item)}
+                        className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${selectedItem?._id === item._id ? 'bg-violet-600 text-white' : 'bg-violet-100 text-violet-700 hover:bg-violet-200'}`}
+                      >
+                        <Layers size={12} />
+                        {selectedItem?._id === item._id ? 'Cerrar' : 'Gestionar'}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -216,6 +335,122 @@ export default function MenuItemsTab() {
           </div>
         )}
       </div>
+
+      {selectedItem && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 bg-violet-50/50 flex items-center justify-between">
+            <h3 className="font-medium text-gray-900 flex items-center gap-2">
+              <Layers size={18} className="text-violet-500" />
+              Ingredientes y tags — {selectedItem.name}
+            </h3>
+            <button type="button" onClick={() => setSelectedItem(null)} className="text-gray-500 hover:text-gray-700 text-sm">
+              Cerrar
+            </button>
+          </div>
+          {arrayMsg && (
+            <div className={`px-4 py-2 text-sm ${arrayMsg.type === 'ok' ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700'}`}>
+              {arrayMsg.text}
+            </div>
+          )}
+          <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <p className="text-xs font-semibold text-gray-500 uppercase">$addToSet — Agregar ingrediente</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={ingredientInput}
+                  onChange={e => setIngredientInput(e.target.value)}
+                  placeholder="Ej: cebolla"
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+                <button type="button" onClick={addIngredient} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-medium">
+                  <Plus size={14} />
+                </button>
+              </div>
+              <p className="text-xs font-semibold text-gray-500 uppercase mt-2">$push + $each — Varios</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={ingredientsMultiple}
+                  onChange={e => setIngredientsMultiple(e.target.value)}
+                  placeholder="Ej: ajo, pimienta"
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+                <button type="button" onClick={addMultipleIngredients} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium">
+                  <Plus size={14} />
+                </button>
+              </div>
+              <p className="text-xs font-semibold text-gray-500 uppercase mt-2">Ingredientes</p>
+              <div className="flex flex-wrap gap-2">
+                {(selectedItem.ingredients ?? []).length === 0 ? (
+                  <span className="text-gray-400 text-sm">Ninguno</span>
+                ) : (
+                  (selectedItem.ingredients ?? []).map((ing: string) => (
+                    <span key={ing} className="inline-flex items-center gap-1 bg-gray-100 text-gray-800 px-2 py-1 rounded text-sm">
+                      {ing}
+                      <button type="button" onClick={() => removeIngredient(ing)} className="text-red-600 hover:text-red-800"><Trash2 size={12} /></button>
+                    </span>
+                  ))
+                )}
+              </div>
+              <p className="text-xs font-semibold text-gray-500 uppercase mt-2">Tags</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={tagInput}
+                  onChange={e => setTagInput(e.target.value)}
+                  placeholder="Ej: vegetariano"
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+                <button type="button" onClick={addTag} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm"><Tag size={14} /></button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {(selectedItem.tags ?? []).length === 0 ? (
+                  <span className="text-gray-400 text-sm">Ninguno</span>
+                ) : (
+                  (selectedItem.tags ?? []).map((t: string) => (
+                    <span key={t} className="inline-flex items-center gap-1 bg-violet-100 text-violet-800 px-2 py-1 rounded text-sm">
+                      {t}
+                      <button type="button" onClick={() => removeTag(t)} className="text-red-600 hover:text-red-800"><Trash2 size={12} /></button>
+                    </span>
+                  ))
+                )}
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Buscar por ingrediente</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={searchIngredient}
+                  onChange={e => setSearchIngredient(e.target.value)}
+                  placeholder="Ej: salchicha"
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+                <button type="button" onClick={searchByIngredient} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                  Buscar
+                </button>
+              </div>
+              {searchResults !== null && (
+                <div className="mt-2 border border-gray-200 rounded-lg p-3 max-h-40 overflow-y-auto">
+                  {searchResults.length === 0 ? (
+                    <p className="text-sm text-gray-500">No hay resultados</p>
+                  ) : (
+                    <ul className="text-sm space-y-1">
+                      {searchResults.map((m: any) => (
+                        <li key={m._id} className="flex justify-between gap-2">
+                          <span className="font-medium text-gray-800">{m.name}</span>
+                          <span className="text-gray-500 truncate">{(m.ingredients ?? []).join(', ')}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

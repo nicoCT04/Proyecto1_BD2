@@ -89,8 +89,9 @@ export default function Dashboard() {
 
   const clearLogs = () => setLogs([]);
 
+  const showDemoRubrica = import.meta.env.VITE_SHOW_DEMO_RUBRICA === 'true';
   const tabs = [
-    { id: 'rubrica', label: 'Demo Rubrica', icon: CheckCircle2, component: RubricaDemoTab },
+    ...(showDemoRubrica ? [{ id: 'rubrica', label: 'Demo Rubrica', icon: CheckCircle2, component: RubricaDemoTab }] : []),
     { id: 'users', label: 'Usuarios', icon: Users, component: UsersTab },
     { id: 'restaurants', label: 'Restaurantes', icon: Store, component: RestaurantsTab },
     { id: 'menu', label: 'Menú', icon: UtensilsCrossed, component: MenuItemsTab },
