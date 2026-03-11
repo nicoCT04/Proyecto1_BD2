@@ -112,3 +112,47 @@ def reset_database(data: dict = Body(default={})):
             "inspections": inspections_count
         }
     }
+
+
+@router.get("/list-indexes")
+def list_indexes_route():
+    """
+    Lista todos los indices de todas las colecciones.
+    Muestra tipo de indice y campos indexados.
+    """
+    collections = ["restaurants", "users", "orders", "reviews", "menu_items", "quality_inspections", "restaurant_visits"]
+    all_indexes = {}
+    
+    for collection_name in collections:
+        collection = db[collection_name]
+        indexes = list(collection.list_indexes())
+        all_indexes[collection_name] = []
+        
+        for idx in indexes:
+            index_info = {
+                "name": idx.get("name"),
+                "keys": dict(idx.get("key", {})),
+                "unique": idx.get("unique", False)
+            }
+            
+            # Detectar tipo de indice
+            keys = idx.get("key", {})
+            if "2dsphere" in str(keys.values()):
+                index_info["type"] = "Geoespacial (2dsphere)"
+            elif "text" in str(keys.values()):
+                index_info["type"] = "Texto (Full-text)"
+            elif len(keys) > 1:
+                index_info["type"] = "Compuesto"
+            else:
+                index_info["type"] = "Simple"
+            
+            all_indexes[collection_name].append(index_info)
+    
+    return {
+        "message": "Indices listados correctamente",
+        "indexes": all_indexes,
+        "resumen": {
+            "total_colecciones": len(collections),
+            "tipos_implementados": ["Simple", "Compuesto", "Geoespacial (2dsphere)", "Texto", "Multikey"]
+        }
+    }

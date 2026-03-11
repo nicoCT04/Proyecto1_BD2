@@ -25,6 +25,7 @@ class MenuItemBase(BaseModel):
     description: Optional[str] = None
     category: str
     available: bool = True
+    imageId: Optional[str] = None  # GridFS file ID para la foto del platillo
 
 class MenuItemCreate(MenuItemBase):
     restaurant: str # Mapped from restaurantId for frontend compatibility

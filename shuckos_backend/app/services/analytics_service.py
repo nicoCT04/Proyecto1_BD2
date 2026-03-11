@@ -64,3 +64,51 @@ def get_conversion_rate_by_restaurant():
     ]
 
     return list(db.restaurant_visits.aggregate(pipeline))
+
+
+def get_orders_count_by_status():
+    """
+    Agregacion simple: cuenta pedidos agrupados por status.
+    Demuestra $group con $sum para conteo.
+    """
+    pipeline = [
+        {
+            "$group": {
+                "_id": "$status",
+                "count": {"$sum": 1}
+            }
+        },
+        {"$sort": {"count": -1}}
+    ]
+    
+    result = list(db.orders.aggregate(pipeline))
+    
+    # Formatear resultado
+    formatted = []
+    for item in result:
+        formatted.append({
+            "status": item["_id"] or "sin_status",
+            "count": item["count"]
+        })
+    
+    return {
+        "message": "Conteo de pedidos por status",
+        "operacion": "$group + $sum (Agregacion Simple)",
+        "data": formatted,
+        "total_pedidos": sum(item["count"] for item in formatted)
+    }
+
+
+def get_distinct_menu_categories():
+    """
+    Agregacion simple: obtiene categorias unicas de menu items.
+    Demuestra uso de distinct.
+    """
+    categories = db.menu_items.distinct("category")
+    
+    return {
+        "message": "Categorias unicas de menu",
+        "operacion": "distinct (Agregacion Simple)",
+        "categorias": categories,
+        "total_categorias": len(categories)
+    }

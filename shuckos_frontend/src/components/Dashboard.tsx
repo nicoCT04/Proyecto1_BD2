@@ -14,7 +14,8 @@ import {
   PieChart,
   ShieldCheck,
   Eye,
-  FileText
+  FileText,
+  CheckCircle2
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -30,6 +31,7 @@ import AtlasChartsTab from './tabs/AtlasChartsTab';
 import InspectionsTab from './tabs/InspectionsTab';
 import VisitsTab from './tabs/VisitsTab';
 import FilesTab from './tabs/FilesTab';
+import RubricaDemoTab from './tabs/RubricaDemoTab';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('restaurants');
@@ -64,6 +66,7 @@ export default function Dashboard() {
   const clearLogs = () => setLogs([]);
 
   const tabs = [
+    { id: 'rubrica', label: 'Demo Rubrica', icon: CheckCircle2, component: RubricaDemoTab },
     { id: 'users', label: 'Usuarios', icon: Users, component: UsersTab },
     { id: 'restaurants', label: 'Restaurantes', icon: Store, component: RestaurantsTab },
     { id: 'menu', label: 'Menú', icon: UtensilsCrossed, component: MenuItemsTab },

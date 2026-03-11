@@ -155,21 +155,60 @@ export default function MenuItemsTab() {
             <table className="w-full text-sm text-left text-gray-500">
               <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                 <tr>
+                  <th className="px-6 py-3">Imagen</th>
                   <th className="px-6 py-3">Categoría</th>
                   <th className="px-6 py-3">Nombre</th>
                   <th className="px-6 py-3 text-right">Precio</th>
-                  <th className="px-6 py-3">ID</th>
+                  <th className="px-6 py-3">GridFS</th>
                 </tr>
               </thead>
               <tbody>
                 {menuItems.map(item => (
                   <tr key={item._id} className="bg-white border-b hover:bg-gray-50">
+                    <td className="px-6 py-4">
+                      {item.imageId ? (
+                        <div className="flex items-center gap-2">
+                          <img 
+                            src={item.imageUrl} 
+                            alt={item.name}
+                            className="w-12 h-12 object-cover rounded-lg border border-gray-200"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIGZpbGw9Im5vbmUiIHZpZXdCb3g9IjAgMCA0OCA0OCIgdHJhbnNmb3JtPSJzY2FsZSgxLjUpIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSI0OCIgaGVpZ2h0PSI0OCIgZmlsbD0iI2Y5ZmFmYiIgcng9IjgiLz48cGF0aCBkPSJtMTYgMjAgOCAxMCA4LTEwIiBzdHJva2U9IiM5Y2EzYWYiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIvPjwvc3ZnPg==';
+                            }}
+                          />
+                          <span className="text-xs text-green-600 font-medium">✓ Con imagen</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
+                            <span className="text-gray-400 text-xs">Sin img</span>
+                          </div>
+                          <span className="text-xs text-gray-400">Sin imagen</span>
+                        </div>
+                      )}
+                    </td>
                     <td className="px-6 py-4 font-medium text-gray-900">
                       <span className="px-2 py-1 bg-gray-100 rounded-md text-xs">{item.category}</span>
                     </td>
                     <td className="px-6 py-4 font-medium text-gray-900">{item.name}</td>
                     <td className="px-6 py-4 text-right font-medium text-emerald-600">Q{item.price.toFixed(2)}</td>
-                    <td className="px-6 py-4 font-mono text-xs text-gray-400">{item._id.slice(-6)}</td>
+                    <td className="px-6 py-4">
+                      {item.imageId ? (
+                        <div className="text-xs">
+                          <div className="font-mono text-gray-400 mb-1">ID: {item.imageId.slice(-6)}...</div>
+                          <a 
+                            href={item.imageUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 underline"
+                          >
+                            Ver archivo
+                          </a>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400">N/A</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
