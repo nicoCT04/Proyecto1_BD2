@@ -530,86 +530,85 @@ export default function RubricaDemoTab() {
       {/* ========== AGREGACIONES (15 puntos) ========== */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <SectionHeader id="aggregations" title="Agregaciones (Simples y Complejas)" points={15} icon={BarChart3} />
-        
-        {expandedSection === 'aggregations' && (
-          <div className="p-6 space-y-6">
-            {/* Simples */}
-            <div className="border-b border-gray-100 pb-4">
-              <h4 className="font-medium text-gray-900 mb-3">Agregaciones Simples (5 pts) - count, distinct</h4>
-              <div className="space-y-3">
-                <DemoButton 
-                  label="Count de Pedidos por Status" 
-                  demoKey="countOrders"
-                  onClick={() => executeDemo('countOrders', async () => {
-                    const res = await fetch('/api/analytics/orders-count-by-status');
-                    return res.json();
-                  })}
-                />
-                <ResultDisplay resultKey="countOrders" />
 
-                <DemoButton 
-                  label="Distinct de Categorias de Menu" 
-                  demoKey="distinctCategories"
-                  onClick={() => executeDemo('distinctCategories', async () => {
-                    const res = await fetch('/api/analytics/distinct-categories');
-                    return res.json();
-                  })}
-                />
-                <ResultDisplay resultKey="distinctCategories" />
+        {expandedSection === 'aggregations' && (
+          <div className="p-6 space-y-8">
+            <div>
+              <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Simples (5 pts) — count, distinct</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="border border-gray-200 rounded-xl p-4 bg-gray-50/50 hover:border-emerald-200 transition-colors">
+                  <p className="font-medium text-gray-900 mb-1">Count por status</p>
+                  <p className="text-xs text-gray-500 mb-3">Pedidos agrupados por estado (delivered, pending, etc.)</p>
+                  <DemoButton
+                    label="Ejecutar"
+                    demoKey="countOrders"
+                    onClick={() => executeDemo('countOrders', async () => {
+                      const res = await fetch('/api/analytics/orders-count-by-status');
+                      return res.json();
+                    })}
+                  />
+                  <ResultDisplay resultKey="countOrders" />
+                </div>
+                <div className="border border-gray-200 rounded-xl p-4 bg-gray-50/50 hover:border-emerald-200 transition-colors">
+                  <p className="font-medium text-gray-900 mb-1">Distinct categorías</p>
+                  <p className="text-xs text-gray-500 mb-3">Categorías únicas del menú</p>
+                  <DemoButton
+                    label="Ejecutar"
+                    demoKey="distinctCategories"
+                    onClick={() => executeDemo('distinctCategories', async () => {
+                      const res = await fetch('/api/analytics/distinct-categories');
+                      return res.json();
+                    })}
+                  />
+                  <ResultDisplay resultKey="distinctCategories" />
+                </div>
               </div>
             </div>
 
-            {/* Complejas */}
             <div>
-              <h4 className="font-medium text-gray-900 mb-3">Agregaciones Complejas (10 pts) - Pipelines</h4>
-              <div className="space-y-3">
-                <DemoButton 
-                  label="Pipeline: Ingresos por Restaurante" 
-                  demoKey="revenueAgg"
-                  onClick={() => executeDemo('revenueAgg', async () => {
-                    const res = await fetch('/api/orders/analytics/revenue');
-                    const data = await res.json();
-                    return {
-                      pipeline: [
-                        '{ $match: { status: "delivered" } }',
-                        '{ $group: { _id: "$restaurantId", totalRevenue: { $sum: "$totalAmount" } } }',
-                        '{ $lookup: { from: "restaurants", ... } }',
-                        '{ $sort: { totalRevenue: -1 } }'
-                      ],
-                      resultados: data
-                    };
-                  })}
-                />
-                <ResultDisplay resultKey="revenueAgg" />
-
-                <DemoButton 
-                  label="Pipeline: Top Productos Vendidos" 
-                  demoKey="topProducts"
-                  onClick={() => executeDemo('topProducts', async () => {
-                    const res = await fetch('/api/orders/analytics/top-products');
-                    const data = await res.json();
-                    return {
-                      pipeline: [
-                        '{ $unwind: "$items" }',
-                        '{ $group: { _id: "$items.name", totalSold: { $sum: "$items.quantity" } } }',
-                        '{ $sort: { totalSold: -1 } }',
-                        '{ $limit: 10 }'
-                      ],
-                      resultados: data
-                    };
-                  })}
-                />
-                <ResultDisplay resultKey="topProducts" />
-
-                <DemoButton 
-                  label="Pipeline: Tasa de Conversion (Visitas -> Pedidos)" 
-                  demoKey="conversionRate"
-                  onClick={() => executeDemo('conversionRate', async () => {
-                    const res = await fetch('/api/analytics/conversion-rate');
-                    return res.json();
-                  })}
-                />
-                <ResultDisplay resultKey="conversionRate" />
+              <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Pipelines (10 pts)</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="border border-gray-200 rounded-xl p-4 bg-gray-50/50 hover:border-blue-200 transition-colors">
+                  <p className="font-medium text-gray-900 mb-1">Ingresos por restaurante</p>
+                  <p className="text-xs text-gray-500 mb-3">$group + $lookup, ordenado por revenue</p>
+                  <DemoButton
+                    label="Ejecutar"
+                    demoKey="revenueAgg"
+                    onClick={() => executeDemo('revenueAgg', async () => {
+                      const res = await fetch('/api/orders/analytics/revenue');
+                      const data = await res.json();
+                      return { pipeline: ['$group', '$lookup', '$sort'], resultados: data };
+                    })}
+                  />
+                  <ResultDisplay resultKey="revenueAgg" />
+                </div>
+                <div className="border border-gray-200 rounded-xl p-4 bg-gray-50/50 hover:border-blue-200 transition-colors">
+                  <p className="font-medium text-gray-900 mb-1">Top productos</p>
+                  <p className="text-xs text-gray-500 mb-3">$unwind items + $group por nombre</p>
+                  <DemoButton
+                    label="Ejecutar"
+                    demoKey="topProducts"
+                    onClick={() => executeDemo('topProducts', async () => {
+                      const res = await fetch('/api/orders/analytics/top-products');
+                      const data = await res.json();
+                      return { pipeline: ['$unwind', '$group', '$sort', '$limit'], resultados: data };
+                    })}
+                  />
+                  <ResultDisplay resultKey="topProducts" />
+                </div>
+                <div className="border border-gray-200 rounded-xl p-4 bg-gray-50/50 hover:border-blue-200 transition-colors">
+                  <p className="font-medium text-gray-900 mb-1">Tasa de conversión</p>
+                  <p className="text-xs text-gray-500 mb-3">Visitas vs pedidos por restaurante</p>
+                  <DemoButton
+                    label="Ejecutar"
+                    demoKey="conversionRate"
+                    onClick={() => executeDemo('conversionRate', async () => {
+                      const res = await fetch('/api/analytics/conversion-rate');
+                      return res.json();
+                    })}
+                  />
+                  <ResultDisplay resultKey="conversionRate" />
+                </div>
               </div>
             </div>
           </div>
