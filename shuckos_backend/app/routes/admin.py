@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Body, HTTPException
 from app.utils.index_creator import create_indexes, configure_no_table_scan, get_index_usage_stats
-from app.utils.seed_data import generate_full_dataset
+from app.utils.seed_data import generate_full_dataset, SHUKOS_NAMES
 from app.database import db
 from datetime import datetime
 
@@ -75,42 +75,55 @@ def seed_full_dataset(data: dict = Body(default={})):
 
 @router.delete("/reset-database")
 def reset_database(data: dict = Body(default={})):
-    # Para mayor seguridad, se puede pasar {"confirm": "YES"} pero no es obligatorio
-    # Si no se pasa confirmación, se asume que se quiere limpiar (para facilitar testing)
-    
-    # Contar documentos antes de eliminar
-    visits_count = db.restaurant_visits.count_documents({})
-    orders_count = db.orders.count_documents({})
-    reviews_count = db.reviews.count_documents({})
-    inspections_count = db.quality_inspections.count_documents({})
-    
-    # Eliminar todas las colecciones de datos generados
-    db.restaurant_visits.delete_many({})
-    db.orders.delete_many({})
-    db.reviews.delete_many({})
-    db.quality_inspections.delete_many({})
-    
-    # Resetear métricas de restaurantes
+    seeded = list(db.restaurants.find({"name": {"$in": SHUKOS_NAMES}}, {"_id": 1}))
+    seeded_ids = [r["_id"] for r in seeded]
+
+    if not seeded_ids:
+        visits_count = db.restaurant_visits.count_documents({})
+        orders_count = db.orders.count_documents({})
+        reviews_count = db.reviews.count_documents({})
+        inspections_count = db.quality_inspections.count_documents({})
+        db.restaurant_visits.delete_many({})
+        db.orders.delete_many({})
+        db.reviews.delete_many({})
+        db.quality_inspections.delete_many({})
+        db.restaurants.update_many(
+            {},
+            {"$set": {"averageRating": 0, "totalReviews": 0, "totalOrders": 0, "averageQualityScore": 0}},
+        )
+        return {
+            "message": "Database cleaned successfully",
+            "deleted": {"visits": visits_count, "orders": orders_count, "reviews": reviews_count, "inspections": inspections_count, "restaurants": 0},
+        }
+
+    visits_count = db.restaurant_visits.count_documents({"restaurantId": {"$in": seeded_ids}})
+    orders_count = db.orders.count_documents({"restaurantId": {"$in": seeded_ids}})
+    reviews_count = db.reviews.count_documents({"restaurantId": {"$in": seeded_ids}})
+    inspections_count = db.quality_inspections.count_documents({"restaurantId": {"$in": seeded_ids}})
+    menu_count = db.menu_items.count_documents({"restaurantId": {"$in": seeded_ids}})
+
+    db.restaurant_visits.delete_many({"restaurantId": {"$in": seeded_ids}})
+    db.orders.delete_many({"restaurantId": {"$in": seeded_ids}})
+    db.reviews.delete_many({"restaurantId": {"$in": seeded_ids}})
+    db.quality_inspections.delete_many({"restaurantId": {"$in": seeded_ids}})
+    db.menu_items.delete_many({"restaurantId": {"$in": seeded_ids}})
+    db.restaurants.delete_many({"_id": {"$in": seeded_ids}})
+
     db.restaurants.update_many(
         {},
-        {
-            "$set": {
-                "averageRating": 0,
-                "totalReviews": 0,
-                "totalOrders": 0,
-                "averageQualityScore": 0
-            }
-        }
+        {"$set": {"averageRating": 0, "totalReviews": 0, "totalOrders": 0, "averageQualityScore": 0, "averageCleanliness": 0}},
     )
 
     return {
-        "message": "Database cleaned successfully", 
+        "message": "Database cleaned successfully",
         "deleted": {
             "visits": visits_count,
             "orders": orders_count,
             "reviews": reviews_count,
-            "inspections": inspections_count
-        }
+            "inspections": inspections_count,
+            "menu_items": menu_count,
+            "restaurants": len(seeded_ids),
+        },
     }
 
 
