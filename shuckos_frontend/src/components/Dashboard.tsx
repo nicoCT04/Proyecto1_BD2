@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { io, Socket } from 'socket.io-client';
-import { 
-  Users, 
-  Store, 
-  UtensilsCrossed, 
-  ShoppingCart, 
-  Star, 
-  BarChart3, 
+import {
+  Users,
+  Store,
+  UtensilsCrossed,
+  ShoppingCart,
+  Star,
+  BarChart3,
   Database,
   Activity,
   Terminal,
@@ -33,27 +32,52 @@ import VisitsTab from './tabs/VisitsTab';
 import FilesTab from './tabs/FilesTab';
 import RubricaDemoTab from './tabs/RubricaDemoTab';
 
+// Module-level variable to track index creation across Strict Mode re-mounts
+let globalIndexesRequested = false;
+
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('restaurants');
   const [logs, setLogs] = useState<any[]>([]);
-  const [socket, setSocket] = useState<Socket | null>(null);
+  const [socket, setSocket] = useState<WebSocket | null>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Conectar al servidor de API (puerto 3000) para recibir logs de MongoDB
-    const socketUrl = window.location.hostname === 'localhost' 
-      ? 'http://localhost:3000' 
-      : window.location.origin;
-      
-    const newSocket = io(socketUrl);
-    setSocket(newSocket);
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = window.location.hostname === 'localhost'
+      ? `ws://localhost:8000/ws/logs`
+      : `${protocol}//${window.location.host}/ws/logs`;
 
-    newSocket.on('mongo-query', (log: any) => {
-      setLogs(prev => [...prev, log]);
-    });
+    const newSocket = new WebSocket(wsUrl);
+
+    newSocket.onopen = () => {
+      setSocket(newSocket);
+      // Solo pedimos los índices una vez en todo el ciclo de vida de la página
+      if (!globalIndexesRequested) {
+        globalIndexesRequested = true;
+        // Esperamos 100ms extra para dar tiempo a Strict Mode y a otras tareas a estabilizarse
+        setTimeout(() => {
+          fetch('/api/admin/create-indexes')
+            .then(res => res.json())
+            .then(data => console.log("Init indexes trigger:", data))
+            .catch(err => console.error("Error init indexes:", err));
+        }, 100);
+      }
+    };
+
+    newSocket.onmessage = (event) => {
+      try {
+        const log = JSON.parse(event.data);
+        setLogs(prev => [...prev, log]);
+      } catch (e) {
+        console.error("Error parsing websocket message", e);
+      }
+    };
 
     return () => {
-      newSocket.disconnect();
+      // Clean closure of the socket on unmount
+      if (newSocket.readyState === WebSocket.OPEN || newSocket.readyState === WebSocket.CONNECTING) {
+        newSocket.close();
+      }
     };
   }, []);
 
@@ -92,7 +116,7 @@ export default function Dashboard() {
           </div>
           <h1 className="font-bold text-xl tracking-tight">Shukos MVP</h1>
         </div>
-        
+
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {tabs.map(tab => {
             const Icon = tab.icon;
@@ -101,11 +125,10 @@ export default function Dashboard() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                  isActive 
-                    ? 'bg-emerald-500/10 text-emerald-400 font-medium' 
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-                }`}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${isActive
+                  ? 'bg-emerald-500/10 text-emerald-400 font-medium'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                  }`}
               >
                 <Icon size={18} />
                 {tab.label}
@@ -113,13 +136,13 @@ export default function Dashboard() {
             );
           })}
         </nav>
-        
+
         <div className="p-4 border-t border-slate-800 text-xs text-slate-500">
           <div className="flex items-center gap-2 mb-1">
             <Activity size={14} className="text-emerald-500" />
             <span>API Conectada</span>
           </div>
-          <p>MongoDB Memory Server</p>
+          <p>MongoDB Atlas (vía FastAPI)</p>
         </div>
       </div>
 
@@ -145,7 +168,7 @@ export default function Dashboard() {
             <Terminal size={18} />
             <h3>MongoDB Query Log</h3>
           </div>
-          <button 
+          <button
             onClick={clearLogs}
             className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-slate-800 rounded-md transition-colors"
             title="Limpiar logs"
@@ -153,7 +176,7 @@ export default function Dashboard() {
             <Trash2 size={16} />
           </button>
         </div>
-        
+
         <div className="flex-1 overflow-y-auto p-4 space-y-4 font-mono text-xs">
           {logs.length === 0 ? (
             <div className="text-slate-600 text-center mt-10">

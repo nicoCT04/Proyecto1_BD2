@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import users
 from app.routes import restaurant
@@ -47,3 +47,15 @@ app.include_router(arrays.router, prefix="/api")
 @app.get("/")
 def root():
    return {"message": "API funcionando"}
+
+from app.websocket_manager import manager
+
+@app.websocket("/ws/logs")
+async def websocket_logs(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            # We just keep the connection open and listen for disconnects
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
