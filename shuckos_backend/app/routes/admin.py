@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Body, HTTPException
-from app.utils.index_creator import create_indexes
+from app.utils.index_creator import create_indexes, configure_no_table_scan, get_index_usage_stats
 from app.utils.seed_data import generate_full_dataset
 from app.database import db
 from datetime import datetime
@@ -9,7 +9,17 @@ router = APIRouter(prefix="/admin", tags=["Admin"])
 @router.get("/create-indexes")
 def create_indexes_route():
     create_indexes()
-    return {"message": "Indexes created successfully"}
+    return {"message": "All index types created successfully (Simple, Compound, Geospatial, Text, Multikey)"}
+
+@router.get("/configure-no-table-scan")
+def configure_no_table_scan_route():
+    result = configure_no_table_scan()
+    return result
+
+@router.get("/index-usage-stats")
+def get_index_stats():
+    stats = get_index_usage_stats()
+    return {"message": "Index usage statistics", "data": stats}
 
 @router.post("/seed-full-dataset")
 def seed_full_dataset(data: dict = Body(default={})):

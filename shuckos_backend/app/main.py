@@ -10,6 +10,7 @@ from app.routes import visits
 from app.routes import analytics
 from app.routes import inspection
 from app.routes import files
+from app.routes import arrays
 
 app = FastAPI(
    title="Plataforma Analítica para Evaluación de Inversión Gastronómica",
@@ -41,6 +42,7 @@ app.include_router(visits.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
 app.include_router(inspection.router, prefix="/api")
 app.include_router(files.router, prefix="/api")
+app.include_router(arrays.router, prefix="/api")
 
 @app.get("/")
 def root():

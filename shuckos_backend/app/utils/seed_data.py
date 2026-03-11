@@ -14,6 +14,71 @@ def generate_full_dataset(restaurant_id: str, user_id: str):
     conversion_rate = 0.10
     review_rate = 0.40
 
+    # PRIMERO: Actualizar el restaurante con datos para índices multikey
+    db.restaurants.update_one(
+        {"_id": restaurant_object_id},
+        {
+            "$set": {
+                "specialties": ["shukos", "bebidas", "postres", "comida_rapida"],  # Array para índice multikey
+                "location": {
+                    "type": "Point",
+                    "coordinates": [-90.5069, 14.6349]
+                },
+                "description": "Restaurante especializado en shukos guatemaltecos auténticos"
+            }
+        }
+    )
+    
+    # Actualizar usuario con ubicación para índice geoespacial
+    db.users.update_one(
+        {"_id": user_object_id},
+        {
+            "$set": {
+                "homeLocation": {
+                    "type": "Point", 
+                    "coordinates": [-90.5100, 14.6400]
+                }
+            }
+        }
+    )
+    
+    # Crear algunos menu items con ingredientes (arrays) para índices multikey
+    menu_items_data = [
+        {
+            "restaurantId": restaurant_object_id,
+            "name": "Shuko Clásico",
+            "description": "Shuko tradicional guatemalteco con todos los ingredientes",
+            "category": "shukos",
+            "ingredients": ["pan", "salchicha", "repollo", "salsa_roja", "mayonesa"],  # Array para multikey
+            "tags": ["tradicional", "popular", "economico"],  # Array para multikey
+            "price": 25.0,
+            "currency": "GTQ",
+            "timesOrdered": 0,
+            "isAvailable": True,
+            "createdAt": datetime.utcnow()
+        },
+        {
+            "restaurantId": restaurant_object_id,
+            "name": "Shuko Especial",
+            "description": "Shuko con ingredientes premium",
+            "category": "shukos",
+            "ingredients": ["pan_artesanal", "chorizo", "repollo_morado", "salsa_verde", "aguacate"],
+            "tags": ["premium", "gourmet", "especial"],
+            "price": 35.0,
+            "currency": "GTQ", 
+            "timesOrdered": 0,
+            "isAvailable": True,
+            "createdAt": datetime.utcnow()
+        }
+    ]
+    
+    # Insertar menu items
+    db.menu_items.insert_many(menu_items_data)
+
+    visit_count = 50000
+    conversion_rate = 0.10
+    review_rate = 0.40
+
     #  1. VISITS
     visit_operations = []
 
