@@ -1,22 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { Store, Plus, Search, MapPin, Tag, Trash2, Edit, X, RefreshCw } from 'lucide-react';
+import { Store, Plus, Search, MapPin, Tag, Trash2, Edit, X, RefreshCw, Navigation } from 'lucide-react';
+
+const GUATEMALA_CITY_LAT = 14.6349;
+const GUATEMALA_CITY_LNG = -90.5069;
+const DEFAULT_RADIUS_KM = 5;
 
 export default function RestaurantsTab() {
   const [restaurants, setRestaurants] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // Form state
+
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [tags, setTags] = useState('');
   const [lat, setLat] = useState('14.6349');
   const [lng, setLng] = useState('-90.5069');
 
-  // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [searchTag, setSearchTag] = useState('');
 
-  // Modal State
+  const [nearbyCenterLat, setNearbyCenterLat] = useState(String(GUATEMALA_CITY_LAT));
+  const [nearbyCenterLng, setNearbyCenterLng] = useState(String(GUATEMALA_CITY_LNG));
+  const [nearbyRadiusKm, setNearbyRadiusKm] = useState(DEFAULT_RADIUS_KM);
+  const [nearbyResult, setNearbyResult] = useState<{
+    resultados?: any[];
+    total?: number;
+    query?: { tipo: string; coordenadas?: number[]; radio_metros?: number };
+    message?: string;
+    error?: string;
+  } | null>(null);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRestaurant, setEditingRestaurant] = useState<any>(null);
 
@@ -131,6 +144,29 @@ export default function RestaurantsTab() {
     setIsModalOpen(true);
   };
 
+  const fetchNearby = async () => {
+    setNearbyLoading(true);
+    setNearbyResult(null);
+    try {
+      const maxDistanceMeters = nearbyRadiusKm * 1000;
+      const res = await fetch(
+        `/api/restaurants/nearby?lat=${nearbyCenterLat}&lng=${nearbyCenterLng}&maxDistance=${maxDistanceMeters}`
+      );
+      const data = await res.json();
+      setNearbyResult(data);
+    } catch (err) {
+      console.error(err);
+      setNearbyResult({
+        message: 'Error en búsqueda',
+        error: String(err),
+        resultados: [],
+        total: 0
+      });
+    } finally {
+      setNearbyLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
@@ -201,6 +237,103 @@ export default function RestaurantsTab() {
             </button>
           </div>
         </form>
+      </div>
+
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <h3 className="text-lg font-medium text-gray-900 mb-2 flex items-center gap-2">
+          <Navigation size={20} className="text-red-500" />
+          Índice Geoespacial (2dsphere) – Buscar Restaurantes Cercanos
+        </h3>
+        <p className="text-sm text-gray-600 mb-4">
+          Busca restaurantes en un radio configurable desde las coordenadas indicadas (por defecto Guatemala City).
+        </p>
+        <div className="flex flex-wrap items-end gap-4 mb-4">
+          <div className="flex-1 min-w-[100px]">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Latitud</label>
+            <input
+              type="number"
+              step="any"
+              value={nearbyCenterLat}
+              onChange={e => setNearbyCenterLat(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+          <div className="flex-1 min-w-[100px]">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Longitud</label>
+            <input
+              type="number"
+              step="any"
+              value={nearbyCenterLng}
+              onChange={e => setNearbyCenterLng(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+          <div className="w-24">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Radio (km)</label>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={nearbyRadiusKm}
+              onChange={e => setNearbyRadiusKm(Number(e.target.value) || 5)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={fetchNearby}
+            disabled={nearbyLoading}
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+          >
+            {nearbyLoading ? (
+              <>
+                <RefreshCw size={16} className="animate-spin" />
+                Buscando...
+              </>
+            ) : (
+              <>
+                <Navigation size={16} />
+                Buscar Cercanos
+              </>
+            )}
+          </button>
+        </div>
+        {nearbyResult && (
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            {nearbyResult.error ? (
+              <p className="text-sm text-amber-700 bg-amber-50 p-3 rounded-lg">
+                {nearbyResult.message}: {nearbyResult.error}. Crea los índices en Admin → create-indexes.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-gray-600 mb-3">
+                  {nearbyResult.query?.tipo} – {nearbyResult.total ?? 0} restaurantes en{' '}
+                  {(nearbyResult.query?.radio_metros ?? 0) / 1000} km.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {(nearbyResult.resultados ?? []).map((rest: any) => (
+                    <div
+                      key={rest._id}
+                      className="border border-gray-200 rounded-lg p-3 bg-gray-50/50 hover:shadow-sm transition-shadow"
+                    >
+                      <h4 className="font-semibold text-gray-900 truncate">{rest.name}</h4>
+                      <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
+                        <MapPin size={12} />
+                        <span className="font-mono">
+                          [{rest.location?.coordinates?.join(', ')}]
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 mt-2">
+                        <span className="text-yellow-500">★</span>
+                        <span className="text-sm font-medium">{rest.rating?.toFixed(1) ?? '0.0'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
