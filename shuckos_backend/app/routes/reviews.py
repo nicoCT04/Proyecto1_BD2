@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Body, HTTPException
+from fastapi import APIRouter, Body, HTTPException, Query
 from app.services.review_service import (
     create_review,
     get_all_reviews,
+    get_reviews_paginated,
     get_reviews_by_restaurant,
     delete_review,
     delete_many_reviews
@@ -18,8 +19,11 @@ def create_review_route(review: ReviewCreate):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/")
-def get_reviews_route():
-    return get_all_reviews()
+def get_reviews_route(
+    limit: int = Query(10, ge=1, le=100),
+    skip: int = Query(0, ge=0)
+):
+    return get_reviews_paginated(limit=limit, skip=skip)
 
 
 @router.get("/restaurant/{restaurant_id}")

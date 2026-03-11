@@ -100,6 +100,13 @@ def get_all_reviews():
     reviews = list(db.reviews.find())
     return [serialize_review(review) for review in reviews]
 
+
+def get_reviews_paginated(limit: int = 10, skip: int = 0):
+    total = db.reviews.count_documents({})
+    cursor = db.reviews.find().sort("createdAt", -1).skip(skip).limit(limit)
+    reviews = [serialize_review(r) for r in cursor]
+    return {"items": reviews, "total": total}
+
 def get_reviews_by_restaurant(restaurant_id: str):
     reviews = list(
         db.reviews.find({"restaurantId": ObjectId(restaurant_id)})
