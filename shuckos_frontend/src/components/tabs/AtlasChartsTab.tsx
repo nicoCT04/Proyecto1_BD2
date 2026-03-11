@@ -3,25 +3,27 @@ import { PieChart, ExternalLink, Info, Link as LinkIcon, Code } from 'lucide-rea
 
 export default function AtlasChartsTab() {
   const [embedCode, setEmbedCode] = useState('');
-  const [iframeSrc, setIframeSrc] = useState('');
+  const [charts, setCharts] = useState<string[]>([]);
 
   const handleEmbed = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Extract src from iframe code if user pasted the whole iframe
+    let src = '';
     if (embedCode.includes('<iframe')) {
       const match = embedCode.match(/src="([^"]+)"/);
       if (match && match[1]) {
-        setIframeSrc(match[1]);
+        src = match[1];
       } else {
         alert('No se pudo encontrar el atributo src en el código del iframe.');
+        return;
       }
     } else if (embedCode.startsWith('http')) {
-      // User pasted just the URL
-      setIframeSrc(embedCode);
+      src = embedCode;
     } else {
       alert('Por favor, ingresa una URL válida o el código del iframe.');
+      return;
     }
+    setCharts((prev) => [...prev, src]);
+    setEmbedCode('');
   };
 
   return (
@@ -95,35 +97,53 @@ export default function AtlasChartsTab() {
         </div>
       </div>
 
-      {/* Iframe Container */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden min-h-[500px] flex flex-col">
-        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+      <div className="space-y-6">
+        <div className="p-4 border border-gray-100 rounded-xl bg-gray-50/50 flex justify-between items-center">
           <h3 className="font-medium text-gray-900 flex items-center gap-2">
             <PieChart size={18} className="text-gray-500" />
-            Visualización del Chart
+            Charts cargados ({charts.length})
           </h3>
-          {iframeSrc && (
+          {charts.length > 0 && (
             <span className="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               Conectado
             </span>
           )}
         </div>
-        
-        <div className="flex-1 bg-gray-50/50 p-4 flex items-center justify-center">
-          {iframeSrc ? (
-            <iframe
-              src={iframeSrc}
-              className="w-full h-full min-h-[500px] border-0 rounded-lg shadow-inner bg-white"
-              title="MongoDB Atlas Chart"
-            />
-          ) : (
+
+        {charts.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 min-h-[300px] flex items-center justify-center p-8">
             <div className="text-center text-gray-400 max-w-sm">
               <PieChart size={48} className="mx-auto mb-3 opacity-20" />
               <p>El chart aparecerá aquí una vez que ingreses una URL o código de inserción válido.</p>
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          charts.map((src, index) => (
+            <div
+              key={`${src.slice(0, 40)}-${index}`}
+              className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col"
+            >
+              <div className="p-3 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+                <span className="text-sm font-medium text-gray-600">Chart {index + 1}</span>
+                <button
+                  type="button"
+                  onClick={() => setCharts((prev) => prev.filter((_, i) => i !== index))}
+                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                >
+                  Quitar
+                </button>
+              </div>
+              <div className="p-4 min-h-[400px] bg-gray-50/50">
+                <iframe
+                  src={src}
+                  className="w-full min-h-[400px] border-0 rounded-lg shadow-inner bg-white"
+                  title={`MongoDB Atlas Chart ${index + 1}`}
+                />
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
