@@ -21,6 +21,14 @@ def get_restaurant_by_id(restaurant_id: str):
     return restaurant
 
 def update_restaurant(restaurant_id: str, data: dict):
+    # Eliminar _id si viene en el body para evitar error de inmutabilidad en Mongo
+    if "_id" in data:
+        data.pop("_id")
+    
+    # Asegurar que las coordenadas sean floats si vienen en el update
+    if "location" in data and "coordinates" in data["location"]:
+        data["location"]["coordinates"] = [float(c) for c in data["location"]["coordinates"]]
+
     db.restaurants.update_one(
         {"_id": ObjectId(restaurant_id)},
         {"$set": data}

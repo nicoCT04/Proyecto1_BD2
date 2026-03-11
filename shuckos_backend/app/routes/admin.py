@@ -8,8 +8,11 @@ router = APIRouter(prefix="/admin", tags=["Admin"])
 
 @router.get("/create-indexes")
 def create_indexes_route():
-    create_indexes()
-    return {"message": "All index types created successfully (Simple, Compound, Geospatial, Text, Multikey)"}
+    try:
+        create_indexes()
+        return {"message": "All index types created successfully (Simple, Compound, Geospatial, Text, Multikey)"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating indexes: {str(e)}")
 
 @router.get("/configure-no-table-scan")
 def configure_no_table_scan_route():

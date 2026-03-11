@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Store, Plus, Search, MapPin, Tag, Trash2 } from 'lucide-react';
+import { Store, Plus, Search, MapPin, Tag, Trash2, Edit, X, RefreshCw } from 'lucide-react';
 
 export default function RestaurantsTab() {
   const [restaurants, setRestaurants] = useState<any[]>([]);
@@ -15,6 +15,10 @@ export default function RestaurantsTab() {
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [searchTag, setSearchTag] = useState('');
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingRestaurant, setEditingRestaurant] = useState<any>(null);
 
   const fetchRestaurants = async () => {
     setLoading(true);
@@ -62,6 +66,53 @@ export default function RestaurantsTab() {
     }
   };
 
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRestaurant) return;
+
+    // Convertir el string de tags de nuevo a un arreglo antes de enviar
+    const processedData = {
+      ...editingRestaurant,
+      tags: typeof editingRestaurant.tags === 'string' 
+        ? editingRestaurant.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
+        : editingRestaurant.tags
+    };
+
+    try {
+      const res = await fetch(`/api/restaurants/${editingRestaurant._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(processedData)
+      });
+      if (res.ok) {
+        setIsModalOpen(false);
+        setEditingRestaurant(null);
+        fetchRestaurants();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleBulkUpdate = async () => {
+    if (!confirm('¿Deseas activar todos los restaurantes del sistema?')) return;
+    try {
+      const res = await fetch('/api/restaurants/', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filter: { },
+          update: { isActive: true, lastBulkUpdate: new Date().toISOString() }
+        })
+      });
+      const data = await res.json();
+      alert(`Actualización masiva completada: ${data.modified} documentos modificados.`);
+      fetchRestaurants();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('¿Seguro que deseas eliminar este restaurante?')) return;
     try {
@@ -70,6 +121,14 @@ export default function RestaurantsTab() {
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const openEditModal = (restaurant: any) => {
+    setEditingRestaurant({
+      ...restaurant,
+      tags: restaurant.tags?.join(', ') || ''
+    });
+    setIsModalOpen(true);
   };
 
   return (
@@ -146,10 +205,19 @@ export default function RestaurantsTab() {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50/50">
-          <h3 className="font-medium text-gray-900 flex items-center gap-2">
-            <Store size={18} className="text-gray-500" />
-            Restaurantes
-          </h3>
+          <div className="flex items-center gap-4">
+            <h3 className="font-medium text-gray-900 flex items-center gap-2">
+              <Store size={18} className="text-gray-500" />
+              Restaurantes
+            </h3>
+            <button 
+              onClick={handleBulkUpdate}
+              className="flex items-center gap-1.5 text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1.5 rounded-lg border border-indigo-100 hover:bg-indigo-100 transition-colors"
+            >
+              <RefreshCw size={14} />
+              Activar Todos
+            </button>
+          </div>
           
           <div className="flex gap-2 w-full sm:w-auto">
             <div className="relative flex-1 sm:w-48">
@@ -183,13 +251,23 @@ export default function RestaurantsTab() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
             {restaurants.map(rest => (
               <div key={rest._id} className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow bg-white relative group">
-                <button 
-                  onClick={() => handleDelete(rest._id)}
-                  className="absolute top-3 right-3 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Trash2 size={16} />
-                </button>
-                <h4 className="font-bold text-lg text-gray-900 mb-1 pr-6">{rest.name}</h4>
+                <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button 
+                    onClick={() => openEditModal(rest)}
+                    className="text-gray-400 hover:text-indigo-500 p-1 bg-gray-50 rounded-md border border-gray-200"
+                    title="Editar"
+                  >
+                    <Edit size={16} />
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(rest._id)}
+                    className="text-gray-400 hover:text-red-500 p-1 bg-gray-50 rounded-md border border-gray-200"
+                    title="Eliminar"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+                <h4 className="font-bold text-lg text-gray-900 mb-1 pr-16">{rest.name}</h4>
                 <p className="text-sm text-gray-500 mb-3 line-clamp-2 h-10">{rest.description}</p>
                 
                 <div className="flex items-center gap-1 text-xs text-gray-500 mb-3">
@@ -217,6 +295,59 @@ export default function RestaurantsTab() {
           </div>
         )}
       </div>
+
+      {/* Edit Modal */}
+      {isModalOpen && editingRestaurant && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                <Edit size={20} className="text-indigo-600" />
+                Editar Restaurante
+              </h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleUpdate} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Nombre</label>
+                <input 
+                  type="text" 
+                  required
+                  value={editingRestaurant.name}
+                  onChange={e => setEditingRestaurant({...editingRestaurant, name: e.target.value})}
+                  className="mt-1 block w-full border border-gray-300 rounded-md p-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Descripción</label>
+                <textarea 
+                  rows={2}
+                  value={editingRestaurant.description}
+                  onChange={e => setEditingRestaurant({...editingRestaurant, description: e.target.value})}
+                  className="mt-1 block w-full border border-gray-300 rounded-md p-2 text-sm"
+                />
+              </div>
+              <div className="flex gap-3">
+                <button 
+                  type="button" 
+                  onClick={() => setIsModalOpen(false)} 
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                >
+                  Guardar Cambios
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
