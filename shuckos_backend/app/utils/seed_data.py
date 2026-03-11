@@ -3,7 +3,7 @@ from bson import ObjectId
 from datetime import datetime, timedelta
 import random
 
-VISIT_CAP = 15000
+VISIT_CAP = 50000
 ORDER_COUNT = 8000
 REVIEW_RATE = 0.70
 INSPECTION_COUNT = 500
@@ -119,24 +119,11 @@ def _ensure_menu_items(restaurant_ids: list) -> dict:
     return by_rest
 
 
-def generate_full_dataset(restaurant_id: str = None, user_id: str = None):
+def generate_full_dataset():
     from pymongo import InsertOne
     restaurant_ids = _ensure_restaurants()
     user_ids = _ensure_users(50)
     menu_by_rest = _ensure_menu_items(restaurant_ids)
-
-    if restaurant_id:
-        rid = ObjectId(restaurant_id)
-        if rid not in restaurant_ids:
-            restaurant_ids = [rid] + restaurant_ids
-    else:
-        rid = random.choice(restaurant_ids)
-    if user_id:
-        uid = ObjectId(user_id)
-        if uid not in user_ids:
-            user_ids = [uid] + user_ids
-    else:
-        uid = random.choice(user_ids)
 
     current_visits = db.restaurant_visits.count_documents({})
     to_add_visits = max(0, VISIT_CAP - current_visits)
@@ -160,6 +147,7 @@ def generate_full_dataset(restaurant_id: str = None, user_id: str = None):
 
     order_ids = []
     menu_list_by_rest = {str(r): menu_by_rest.get(r, []) for r in restaurant_ids}
+    order_batch = []
     for _ in range(ORDER_COUNT):
         rest_id = random.choice(restaurant_ids)
         user_id = random.choice(user_ids)
@@ -192,8 +180,14 @@ def generate_full_dataset(restaurant_id: str = None, user_id: str = None):
             "orderDate": _random_date(365),
             "userLocation": {"type": "Point", "coordinates": [-90.5 + random.random() * 0.1, 14.6 + random.random() * 0.1]},
         }
-        result = db.orders.insert_one(order)
-        order_ids.append(result.inserted_id)
+        order_batch.append(order)
+        if len(order_batch) >= BATCH_SIZE:
+            result = db.orders.insert_many(order_batch)
+            order_ids.extend(result.inserted_ids)
+            order_batch = []
+    if order_batch:
+        result = db.orders.insert_many(order_batch)
+        order_ids.extend(result.inserted_ids)
 
     review_count = int(len(order_ids) * REVIEW_RATE)
     selected = random.sample(order_ids, min(review_count, len(order_ids)))
