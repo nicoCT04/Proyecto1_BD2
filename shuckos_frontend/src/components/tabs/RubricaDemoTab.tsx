@@ -130,7 +130,7 @@ export default function RubricaDemoTab() {
   return (
     <div className="space-y-4 max-w-5xl mx-auto">
       <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white p-6 rounded-xl mb-6">
-        <h2 className="text-2xl font-bold mb-2">Demostracion de Rubrica - CC3089</h2>
+        <h2 className="text-2xl font-bold mb-2">Demostracion de Rubrica</h2>
         <p className="text-slate-300">
           Panel interactivo para demostrar cada criterio de evaluacion del proyecto.
           Haz clic en cada seccion para expandirla y ejecutar las demostraciones.
@@ -855,49 +855,6 @@ export default function RubricaDemoTab() {
             </div>
           </div>
         )}
-      </div>
-
-      {/* Footer con resumen */}
-      <div className="bg-slate-100 p-6 rounded-xl border border-slate-200">
-        <h3 className="font-bold text-slate-800 mb-3">Resumen de Puntos</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-          <div className="bg-white p-3 rounded-lg">
-            <p className="text-gray-500">Indices</p>
-            <p className="text-2xl font-bold text-emerald-600">5 pts</p>
-          </div>
-          <div className="bg-white p-3 rounded-lg">
-            <p className="text-gray-500">CRUD</p>
-            <p className="text-2xl font-bold text-emerald-600">45 pts</p>
-          </div>
-          <div className="bg-white p-3 rounded-lg">
-            <p className="text-gray-500">GridFS + 50K</p>
-            <p className="text-2xl font-bold text-emerald-600">5 pts</p>
-          </div>
-          <div className="bg-white p-3 rounded-lg">
-            <p className="text-gray-500">Agregaciones</p>
-            <p className="text-2xl font-bold text-emerald-600">15 pts</p>
-          </div>
-          <div className="bg-white p-3 rounded-lg">
-            <p className="text-gray-500">Arrays</p>
-            <p className="text-2xl font-bold text-emerald-600">10 pts</p>
-          </div>
-          <div className="bg-white p-3 rounded-lg">
-            <p className="text-gray-500">Embebidos</p>
-            <p className="text-2xl font-bold text-emerald-600">5 pts</p>
-          </div>
-          <div className="bg-white p-3 rounded-lg">
-            <p className="text-gray-500">Modelo</p>
-            <p className="text-2xl font-bold text-emerald-600">5 pts</p>
-          </div>
-          <div className="bg-white p-3 rounded-lg">
-            <p className="text-gray-500">Documentacion</p>
-            <p className="text-2xl font-bold text-emerald-600">10 pts</p>
-          </div>
-        </div>
-        <div className="mt-4 pt-4 border-t border-slate-300 flex justify-between items-center">
-          <span className="font-bold text-slate-700">TOTAL BASE:</span>
-          <span className="text-3xl font-bold text-emerald-600">100 pts</span>
-        </div>
       </div>
     </div>
   );
