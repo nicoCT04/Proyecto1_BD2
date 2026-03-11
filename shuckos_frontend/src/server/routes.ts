@@ -367,29 +367,275 @@ router.post('/admin/seed-visits', async (req, res) => {
   res.json({ message: '50,000 documentos insertados' });
 });
 
+const BATCH_SIZE = 2000;
+const VISIT_COUNT = 20000;
+const CONVERSION_RATE = 0.12;
+const REVIEW_RATE = 0.35;
+const INSPECTION_COUNT = 300;
+
+const RESTAURANT_NAMES = [
+  'La Mariscada', 'El Fogón', 'Sabor Oriental', 'Pizzería Roma', 'Tacos & Más',
+  'Café Central', 'Sushi Bar', 'Parrilla del Sur', 'Vegetariano Verde', 'Dulce Tentación'
+];
+
+const MENU_CATEGORIES = ['Entradas', 'Platos fuertes', 'Postres', 'Bebidas', 'Ensaladas'];
+const MENU_ITEMS_BY_CAT: Record<string, string[]> = {
+  Entradas: ['Ceviche', 'Sopa del día', 'Bruschetta', 'Ensalada César', 'Empanadas'],
+  'Platos fuertes': ['Pasta carbonara', 'Pollo al horno', 'Risotto', 'Parrillada', 'Pescado grill'],
+  Postres: ['Flan', 'Brownie', 'Helado', 'Tiramisú', 'Cheesecake'],
+  Bebidas: ['Limonada', 'Jugo natural', 'Café', 'Agua mineral', 'Cerveza'],
+  Ensaladas: ['Ensalada griega', 'Ensalada mixta', 'Ensalada de quinoa', 'Caprese', 'Waldorf']
+};
+
+const REVIEW_COMMENTS = [
+  'Muy bueno, volveré.', 'Excelente servicio.', 'Rico y abundante.',
+  'Recomendado.', 'Buen ambiente y buena comida.'
+];
+
+function randomChoice<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function randomInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function randomDate(daysBack: number): Date {
+  return new Date(Date.now() - Math.random() * daysBack * 24 * 60 * 60 * 1000);
+}
+
 router.post('/admin/seed-full-dataset', async (req, res) => {
-   // A simplified placeholder to indicate support for the full seed endpoint.
-   res.json({ message: 'Proceso de generación iniciado (placeholder en este entorno)' });
+  try {
+    const db = mongoose.connection.db;
+    if (!db) return res.status(500).json({ error: 'DB not connected' });
+
+    const existingRestaurants = await Restaurant.find().limit(RESTAURANT_NAMES.length).lean();
+    let restaurantIds: mongoose.Types.ObjectId[] = existingRestaurants.map((r: any) => r._id);
+
+    if (restaurantIds.length === 0) {
+      const toInsert = RESTAURANT_NAMES.map((name, i) => ({
+        name,
+        description: `Restaurante ${name} - especialidades de la casa`,
+        location: { type: 'Point' as const, coordinates: [-90.5 + i * 0.01, 14.63 + i * 0.005] },
+        tags: ['comida', 'local', 'variado'],
+        rating: 0
+      }));
+      const inserted = await Restaurant.insertMany(toInsert);
+      restaurantIds = inserted.map((r) => r._id);
+    }
+
+    let userIds: mongoose.Types.ObjectId[] = (await User.find().limit(30).lean()).map((u: any) => u._id);
+    if (userIds.length < 15) {
+      const base = Date.now().toString(36);
+      const toInsert = Array.from({ length: 20 }, (_, i) => ({
+        name: `Usuario Demo ${i + 1}`,
+        email: `demo.${base}.${i}@example.com`,
+        location: { type: 'Point' as const, coordinates: [-90.5 + Math.random() * 0.1, 14.6 + Math.random() * 0.1] },
+        createdAt: randomDate(365)
+      }));
+      const inserted = await User.insertMany(toInsert);
+      userIds = [...userIds, ...inserted.map((u) => u._id)];
+    }
+
+    const existingMenuCount = await MenuItem.countDocuments();
+    if (existingMenuCount < restaurantIds.length * 5) {
+      const menuDocs: any[] = [];
+      for (const rid of restaurantIds) {
+        for (const cat of MENU_CATEGORIES) {
+          const names = MENU_ITEMS_BY_CAT[cat];
+          for (let i = 0; i < 2; i++) {
+            menuDocs.push({
+              restaurant: rid,
+              name: names[i % names.length] + ` ${cat}`,
+              price: randomInt(25, 120),
+              category: cat
+            });
+          }
+        }
+      }
+      await MenuItem.insertMany(menuDocs);
+    }
+
+    let menuByRestaurant = await MenuItem.aggregate([
+      { $group: { _id: '$restaurant', items: { $push: { _id: '$_id', name: '$name', price: '$price' } } } }
+    ]);
+    const restIdsWithoutMenu = restaurantIds.filter((rid) => !menuByRestaurant.some((g: any) => g._id.toString() === rid.toString()));
+    if (restIdsWithoutMenu.length > 0) {
+      const extraMenuDocs: any[] = [];
+      for (const rid of restIdsWithoutMenu) {
+        for (const cat of MENU_CATEGORIES.slice(0, 2)) {
+          const names = MENU_ITEMS_BY_CAT[cat];
+          extraMenuDocs.push({
+            restaurant: rid,
+            name: (names[0] || 'Plato') + ` ${cat}`,
+            price: randomInt(25, 80),
+            category: cat
+          });
+        }
+      }
+      await MenuItem.insertMany(extraMenuDocs);
+      menuByRestaurant = await MenuItem.aggregate([
+        { $group: { _id: '$restaurant', items: { $push: { _id: '$_id', name: '$name', price: '$price' } } } }
+      ]);
+    }
+    const menuMap = new Map(menuByRestaurant.map((g: any) => [g._id.toString(), g.items]));
+    const anyRestItems = menuByRestaurant.find((g: any) => g.items?.length)?.items || [];
+
+    const visitOps: any[] = [];
+    for (let i = 0; i < VISIT_COUNT; i++) {
+      const restId = randomChoice(restaurantIds);
+      visitOps.push({
+        restaurant: restId,
+        timestamp: randomDate(365),
+        ip: `192.168.${randomInt(0, 255)}.${randomInt(1, 254)}`
+      });
+      if (visitOps.length >= BATCH_SIZE) {
+        await Visit.insertMany(visitOps);
+        visitOps.length = 0;
+      }
+    }
+    if (visitOps.length) await Visit.insertMany(visitOps);
+
+    const totalOrders = Math.floor(VISIT_COUNT * CONVERSION_RATE);
+    const orderDocs: any[] = [];
+    for (let i = 0; i < totalOrders; i++) {
+      const restId = randomChoice(restaurantIds);
+      const userId = randomChoice(userIds);
+      const itemsArr = menuMap.get(restId.toString()) || [];
+      const numItems = Math.max(1, Math.min(3, itemsArr.length));
+      const pool = itemsArr.length ? itemsArr : anyRestItems;
+      const chosen = pool.length
+        ? Array.from({ length: numItems }, () => pool[randomInt(0, pool.length - 1)])
+        : [];
+      if (chosen.length === 0) continue;
+      const items = chosen.map((it: any) => ({
+        menuItem: it._id,
+        name: it.name,
+        price: it.price,
+        quantity: randomInt(1, 2)
+      }));
+      const totalAmount = items.reduce((s: number, it: any) => s + it.price * it.quantity, 0);
+      orderDocs.push({
+        user: userId,
+        restaurant: restId,
+        items,
+        totalAmount,
+        status: 'delivered',
+        orderDate: randomDate(365)
+      });
+    }
+    const insertedOrders = await Order.insertMany(orderDocs);
+    const orderIds = insertedOrders.map((o) => o._id);
+    const reviewCount = Math.floor(orderIds.length * REVIEW_RATE);
+    const selectedOrders = [...orderIds].sort(() => Math.random() - 0.5).slice(0, reviewCount);
+    const reviewsToInsert: any[] = [];
+    const orderToUserRest = new Map<string, { user: mongoose.Types.ObjectId; restaurant: mongoose.Types.ObjectId }>();
+    const ordersWithMeta = await Order.find(
+      { _id: { $in: selectedOrders } },
+      { user: 1, restaurant: 1 }
+    ).lean();
+    ordersWithMeta.forEach((o: any) => orderToUserRest.set(o._id.toString(), { user: o.user, restaurant: o.restaurant }));
+    for (const oid of selectedOrders) {
+      const meta = orderToUserRest.get(oid.toString());
+      if (!meta) continue;
+      reviewsToInsert.push({
+        user: meta.user,
+        restaurant: meta.restaurant,
+        rating: randomInt(3, 5),
+        comment: randomChoice(REVIEW_COMMENTS),
+        createdAt: randomDate(180)
+      });
+    }
+    if (reviewsToInsert.length) await Review.insertMany(reviewsToInsert);
+
+    const inspectionsToInsert: any[] = [];
+    for (let i = 0; i < INSPECTION_COUNT; i++) {
+      const restId = randomChoice(restaurantIds);
+      const inspectorId = randomChoice(userIds);
+      const food = randomInt(6, 10);
+      const surface = randomInt(6, 10);
+      const staff = randomInt(6, 10);
+      const overall = (food + surface + staff) / 3;
+      inspectionsToInsert.push({
+        restaurant: restId,
+        inspectorId,
+        inspectionDate: randomDate(365),
+        scores: { foodHandling: food, surfaceCleanliness: surface, staffHygiene: staff },
+        overallScore: Math.round(overall * 10) / 10,
+        observations: 'Inspección rutinaria.',
+        nextInspectionDate: randomDate(-90)
+      });
+    }
+    await QualityInspection.insertMany(inspectionsToInsert);
+
+    const ratingAgg = await Review.aggregate([
+      { $group: { _id: '$restaurant', avgRating: { $avg: '$rating' }, count: { $sum: 1 } } }
+    ]);
+    for (const r of ratingAgg) {
+      await Restaurant.findByIdAndUpdate(r._id, {
+        rating: Math.round(r.avgRating * 10) / 10
+      });
+    }
+
+    const finalCounts = {
+      restaurants: await Restaurant.countDocuments(),
+      users: await User.countDocuments(),
+      menuItems: await MenuItem.countDocuments(),
+      visits: await Visit.countDocuments(),
+      orders: await Order.countDocuments(),
+      reviews: await Review.countDocuments(),
+      inspections: await QualityInspection.countDocuments()
+    };
+
+    res.json({
+      message: 'Dataset completo generado correctamente',
+      ...finalCounts
+    });
+  } catch (e) {
+    console.error('Seed error:', e);
+    res.status(500).json({ error: 'Error al generar dataset', detail: String(e) });
+  }
 });
 
 router.get('/admin/create-indexes', async (req, res) => {
-   // Mongoose handles most indexes on startup if defined in schema, 
-   // but this endpoint is included to satisfy the API spec.
-   await User.syncIndexes();
-   await Restaurant.syncIndexes();
-   await Order.syncIndexes();
-   await Review.syncIndexes();
-   await MenuItem.syncIndexes();
-   res.json({ message: 'Índices sincronizados' });
+  await User.syncIndexes();
+  await Restaurant.syncIndexes();
+  await Order.syncIndexes();
+  await Review.syncIndexes();
+  await MenuItem.syncIndexes();
+  await Visit.syncIndexes();
+  await QualityInspection.syncIndexes();
+  res.json({ message: 'Índices sincronizados' });
 });
 
 router.delete('/admin/reset-database', async (req, res) => {
-   if (mongoose.connection.db) {
-       await mongoose.connection.db.dropDatabase();
-       res.json({ message: 'Base de datos reiniciada' });
-   } else {
-       res.status(500).json({ error: 'DB not connected' });
-   }
+  try {
+    if (!mongoose.connection.db) return res.status(500).json({ error: 'DB not connected' });
+    const [orders, reviews, visits, inspections, menuItems, restaurants, users] = await Promise.all([
+      Order.deleteMany({}),
+      Review.deleteMany({}),
+      Visit.deleteMany({}),
+      QualityInspection.deleteMany({}),
+      MenuItem.deleteMany({}),
+      Restaurant.deleteMany({}),
+      User.deleteMany({})
+    ]);
+    res.json({
+      message: 'Base de datos reiniciada (borrado bulk)',
+      deleted: {
+        orders: orders.deletedCount,
+        reviews: reviews.deletedCount,
+        visits: visits.deletedCount,
+        inspections: inspections.deletedCount,
+        menuItems: menuItems.deletedCount,
+        restaurants: restaurants.deletedCount,
+        users: users.deletedCount
+      }
+    });
+  } catch (e) {
+    console.error('Reset error:', e);
+    res.status(500).json({ error: 'Error al reiniciar base de datos', detail: String(e) });
+  }
 });
 
 router.post('/admin/bulk-insert', async (req, res) => {

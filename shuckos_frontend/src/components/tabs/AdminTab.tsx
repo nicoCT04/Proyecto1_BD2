@@ -5,6 +5,8 @@ export default function AdminTab() {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [fileId, setFileId] = useState('');
+  const [loadingSeed, setLoadingSeed] = useState(false);
+  const [loadingReset, setLoadingReset] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -106,38 +108,47 @@ export default function AdminTab() {
           Genera datos de prueba para todas las colecciones o reinicia la base de datos.
         </p>
         <div className="flex flex-wrap gap-4">
-          <button 
+          <button
             onClick={async () => {
+              setLoadingSeed(true);
               try {
-                alert('Generando dataset completo... esto puede tardar unos segundos.');
                 const res = await fetch('/api/admin/seed-full-dataset', { method: 'POST' });
                 const data = await res.json();
+                if (!res.ok) throw new Error(data.error || data.detail || 'Error');
                 alert(data.message || 'Dataset generado correctamente');
               } catch (err) {
                 console.error(err);
-                alert('Error al generar documentos');
+                alert(err instanceof Error ? err.message : 'Error al generar documentos');
+              } finally {
+                setLoadingSeed(false);
               }
             }}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+            disabled={loadingSeed || loadingReset}
+            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-medium transition-colors"
           >
-            Generar Dataset Completo
+            {loadingSeed ? 'Generando...' : 'Generar Dataset Completo'}
           </button>
 
-          <button 
+          <button
             onClick={async () => {
               if (!confirm('¿Estás seguro de que deseas eliminar todos los datos?')) return;
+              setLoadingReset(true);
               try {
                 const res = await fetch('/api/admin/reset-database', { method: 'DELETE' });
                 const data = await res.json();
+                if (!res.ok) throw new Error(data.error || data.detail || 'Error');
                 alert(data.message || 'Base de datos reiniciada');
               } catch (err) {
                 console.error(err);
-                alert('Error al reiniciar base de datos');
+                alert(err instanceof Error ? err.message : 'Error al reiniciar base de datos');
+              } finally {
+                setLoadingReset(false);
               }
             }}
-            className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+            disabled={loadingSeed || loadingReset}
+            className="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-medium transition-colors"
           >
-            Reiniciar Base de Datos
+            {loadingReset ? 'Reiniciando...' : 'Reiniciar Base de Datos'}
           </button>
         </div>
       </div>
