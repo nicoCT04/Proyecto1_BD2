@@ -2,6 +2,7 @@ from fastapi import APIRouter, Body, Query
 from app.services.restaurant_service import (
     create_restaurant,
     get_all_restaurants,
+    get_restaurants_list,
     get_restaurant_by_id,
     update_restaurant,
     delete_restaurant,
@@ -19,7 +20,12 @@ def create_restaurant_route(restaurant: RestaurantCreate):
     return {"id": create_restaurant(restaurant.dict())}
 
 @router.get("/")
-def get_restaurants_route():
+def get_restaurants_route(
+    search: str = Query(None, description="Búsqueda full-text en nombre y descripción"),
+    tag: str = Query(None, description="Filtrar por tag (usa índice multikey)")
+):
+    if search is not None or tag is not None:
+        return get_restaurants_list(search=search, tag=tag)
     return get_all_restaurants()
 
 # Busqueda geoespacial - debe ir antes de /{restaurant_id}

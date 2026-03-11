@@ -6,11 +6,35 @@ def create_restaurant(data: dict):
     return str(result.inserted_id)
 
 def get_all_restaurants():
-    restaurants = list(db.restaurants.find())
+    restaurants = list(db.restaurants.find({"isActive": True}))
     for r in restaurants:
         r["_id"] = str(r["_id"])
-        # Mapear averageRating a rating para compatibilidad con el frontend
         r["rating"] = r.get("averageRating", 0)
+    return restaurants
+
+
+def get_restaurants_list(search: str = None, tag: str = None):
+    """
+    Lista restaurantes activos, opcionalmente filtrados por búsqueda de texto
+    y/o por tag.
+    """
+    query = {"isActive": True}
+    if search and search.strip():
+        query["$text"] = {"$search": search.strip()}
+    if tag and tag.strip():
+        query["tags"] = tag.strip()
+    projection = None
+    if search and search.strip():
+        projection = {"score": {"$meta": "textScore"}}
+    cursor = db.restaurants.find(query, projection)
+    if search and search.strip():
+        cursor = cursor.sort([("score", {"$meta": "textScore"})])
+    cursor = cursor.limit(500)
+    restaurants = list(cursor)
+    for r in restaurants:
+        r["_id"] = str(r["_id"])
+        r["rating"] = r.get("averageRating", 0)
+        r.pop("score", None)
     return restaurants
 
 def get_restaurant_by_id(restaurant_id: str):

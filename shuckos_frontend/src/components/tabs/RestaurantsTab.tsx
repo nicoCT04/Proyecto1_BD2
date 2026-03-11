@@ -107,19 +107,38 @@ export default function RestaurantsTab() {
     }
   };
 
-  const handleBulkUpdate = async () => {
-    if (!confirm('¿Deseas activar todos los restaurantes del sistema?')) return;
+  const handleBulkActivate = async () => {
+    if (!confirm('¿Activar todos los restaurantes?')) return;
     try {
       const res = await fetch('/api/restaurants/', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          filter: { },
+          filter: {},
           update: { isActive: true, lastBulkUpdate: new Date().toISOString() }
         })
       });
       const data = await res.json();
-      alert(`Actualización masiva completada: ${data.modified} documentos modificados.`);
+      alert(`Activados: ${data.modified} restaurantes.`);
+      fetchRestaurants();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleBulkDeactivate = async () => {
+    if (!confirm('¿Desactivar todos los restaurantes?')) return;
+    try {
+      const res = await fetch('/api/restaurants/', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filter: {},
+          update: { isActive: false, lastBulkUpdate: new Date().toISOString() }
+        })
+      });
+      const data = await res.json();
+      alert(`Desactivados: ${data.modified} restaurantes.`);
       fetchRestaurants();
     } catch (err) {
       console.error(err);
@@ -343,12 +362,18 @@ export default function RestaurantsTab() {
               <Store size={18} className="text-gray-500" />
               Restaurantes
             </h3>
-            <button 
-              onClick={handleBulkUpdate}
-              className="flex items-center gap-1.5 text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1.5 rounded-lg border border-indigo-100 hover:bg-indigo-100 transition-colors"
+            <button
+              onClick={handleBulkActivate}
+              className="flex items-center gap-1.5 text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-colors"
             >
               <RefreshCw size={14} />
               Activar Todos
+            </button>
+            <button
+              onClick={handleBulkDeactivate}
+              className="flex items-center gap-1.5 text-xs bg-slate-100 text-slate-700 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-200 transition-colors"
+            >
+              Desactivar Todos
             </button>
           </div>
           

@@ -63,6 +63,22 @@ export default function OrdersTab() {
     } catch (err) { console.error(err); }
   };
 
+  const ORDER_STATUSES = ['pending', 'confirmed', 'preparing', 'delivered', 'cancelled'];
+
+  const handleStatusChange = async (orderId: string, newStatus: string) => {
+    try {
+      const res = await fetch(`/api/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (res.ok) fetchOrders();
+      else alert((await res.json()).detail || 'No se pudo actualizar');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleAddItem = (menuItemId: string) => {
     setOrderItems(prev => {
       const existing = prev.find(i => i.menuItemId === menuItemId);
@@ -323,10 +339,23 @@ export default function OrdersTab() {
                       Q{order.totalAmount?.toFixed(2)}
                     </td>
                     <td className="px-6 py-4">
-                      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusBadge(order.status)}`}>
-                        {getStatusIcon(order.status)}
-                        <span className="capitalize">{order.status}</span>
-                      </div>
+                      {['delivered', 'cancelled'].includes(order.status) ? (
+                        <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusBadge(order.status)}`}>
+                          {getStatusIcon(order.status)}
+                          <span className="capitalize">{order.status}</span>
+                        </div>
+                      ) : (
+                        <select
+                          value={order.status}
+                          onChange={e => handleStatusChange(order._id, e.target.value)}
+                          className={`text-xs font-medium rounded-lg border px-2 py-1 cursor-pointer ${getStatusBadge(order.status)}`}
+                          title="Actualizar 1 documento (updateOne)"
+                        >
+                          {ORDER_STATUSES.map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      )}
                     </td>
                   </tr>
                 ))}

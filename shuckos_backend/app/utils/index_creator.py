@@ -84,6 +84,7 @@ def create_indexes():
     db.menu_items.create_index("ingredients")
     db.menu_items.create_index("tags")
     db.restaurants.create_index("specialties")
+    db.restaurants.create_index("tags")
     
     print("Todos los índices creados correctamente con soporte para nulos en reseñas.")
     

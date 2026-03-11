@@ -40,12 +40,21 @@ class MongoCommandLogger(pymongo.monitoring.CommandListener):
         query = command.get('filter', command.get('query', {}))
         doc = command.get('documents', command.get('updates', command.get('insert', {})))
         
-        # Opciones varias que podemos querer ver
         options = {}
         if 'sort' in command: options['sort'] = command['sort']
         if 'limit' in command: options['limit'] = command['limit']
         if 'skip' in command: options['skip'] = command['skip']
         if 'pipeline' in command: options['pipeline'] = command['pipeline']
+
+        index_used = []
+        if isinstance(query, dict):
+            if "$text" in query:
+                index_used.append("Texto (full-text)")
+            if "tags" in query:
+                index_used.append("Multikey (tags)")
+            loc = query.get("location")
+            if isinstance(loc, dict) and ("$near" in loc or "$geoWithin" in loc):
+                index_used.append("2dsphere")
 
         log_entry = {
             "collection": collection_name,
@@ -55,6 +64,8 @@ class MongoCommandLogger(pymongo.monitoring.CommandListener):
             "options": safe_stringify(options) if options else "{}",
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
+        if index_used:
+            log_entry["indexUsed"] = index_used
         
         print(f"[MongoDB-API] {collection_name}.{command_name}")
         
